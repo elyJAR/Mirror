@@ -34,7 +34,7 @@ class DiscoveryManager(private val context: Context) {
     private val wifiManager: WifiManager =
         context.getSystemService(Context.WIFI_SERVICE) as WifiManager
 
-    private val channel: WifiP2pManager.Channel =
+    private val p2pChannel: WifiP2pManager.Channel =
         wifiP2pManager.initialize(context, Looper.getMainLooper(), null)
 
     /**
@@ -75,7 +75,7 @@ class DiscoveryManager(private val context: Context) {
                 when (intent.action) {
                     WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
                         @Suppress("DEPRECATION")
-                        wifiP2pManager.requestPeers(channel) { peerList ->
+                        wifiP2pManager.requestPeers(p2pChannel) { peerList ->
                             val peers = peerList.deviceList.toList()
                             if (peers.isNotEmpty()) {
                                 trySend(DiscoveryEvent.PeersFound(peers))
@@ -107,7 +107,7 @@ class DiscoveryManager(private val context: Context) {
             }
         }
 
-        wifiP2pManager.discoverPeers(channel, actionListener)
+        wifiP2pManager.discoverPeers(p2pChannel, actionListener)
 
         // Apply 30-second timeout — emit NoPeersFound if nothing arrives in time
         withTimeoutOrNull(DISCOVERY_TIMEOUT_MS) {
@@ -135,7 +135,7 @@ class DiscoveryManager(private val context: Context) {
 
     /** Stops an in-progress discovery scan. */
     fun stopDiscovery() {
-        wifiP2pManager.stopPeerDiscovery(channel, null)
+        wifiP2pManager.stopPeerDiscovery(p2pChannel, null)
     }
 
     /**
@@ -157,7 +157,7 @@ class DiscoveryManager(private val context: Context) {
                 when (intent.action) {
                     WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
                         // Request group info to confirm we are the GO
-                        wifiP2pManager.requestGroupInfo(channel) { group ->
+                        wifiP2pManager.requestGroupInfo(p2pChannel) { group ->
                             if (group != null && group.isGroupOwner) {
                                 // The GO IP is always 192.168.49.1 on Android
                                 val goAddress = InetAddress.getByName("192.168.49.1")
@@ -180,7 +180,7 @@ class DiscoveryManager(private val context: Context) {
             override fun onSuccess() {
                 Log.d(TAG, "connect() initiated successfully, waiting for connection changed broadcast")
                 // Also request group info immediately in case we are already connected
-                wifiP2pManager.requestGroupInfo(channel) { group ->
+                wifiP2pManager.requestGroupInfo(p2pChannel) { group ->
                     if (group != null && group.isGroupOwner) {
                         val goAddress = InetAddress.getByName("192.168.49.1")
                         trySend(ConnectionEvent.Connected(goAddress))
@@ -196,7 +196,7 @@ class DiscoveryManager(private val context: Context) {
             }
         }
 
-        wifiP2pManager.connect(channel, config, actionListener)
+        wifiP2pManager.connect(p2pChannel, config, actionListener)
 
         awaitClose {
             try {
@@ -209,7 +209,7 @@ class DiscoveryManager(private val context: Context) {
 
     /** Disconnects from the current Wi-Fi Direct group. */
     fun disconnect() {
-        wifiP2pManager.removeGroup(channel, null)
+        wifiP2pManager.removeGroup(p2pChannel, null)
     }
 }
 
