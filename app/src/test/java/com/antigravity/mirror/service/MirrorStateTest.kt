@@ -1,14 +1,16 @@
 package com.antigravity.mirror.service
 
-import android.net.wifi.p2p.WifiP2pDevice
-import io.mockk.mockk
+import com.antigravity.mirror.stream.api.MirrorError
+import com.antigravity.mirror.stream.api.MirrorState
+import com.antigravity.mirror.stream.api.Receiver
+import com.antigravity.mirror.stream.transport.TransportId
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Unit tests for the [MirrorState] sealed class hierarchy.
+ * Unit tests for the [MirrorState] sealed interface hierarchy.
  *
  * Validates: Requirements 6.1, 6.2
  */
@@ -36,9 +38,16 @@ class MirrorStateTest {
     }
 
     @Test
-    fun `AwaitingProjectionConsent is a singleton object`() {
-        val s1: MirrorState = MirrorState.AwaitingProjectionConsent
-        val s2: MirrorState = MirrorState.AwaitingProjectionConsent
+    fun `AwaitingPairing is a singleton object`() {
+        val s1: MirrorState = MirrorState.AwaitingPairing
+        val s2: MirrorState = MirrorState.AwaitingPairing
+        assertEquals(s1, s2)
+    }
+
+    @Test
+    fun `AwaitingProjection is a singleton object`() {
+        val s1: MirrorState = MirrorState.AwaitingProjection
+        val s2: MirrorState = MirrorState.AwaitingProjection
         assertEquals(s1, s2)
     }
 
@@ -50,29 +59,36 @@ class MirrorStateTest {
     }
 
     @Test
-    fun `DevicesFound carries device list`() {
-        // Use mockk to avoid instantiating the Android framework class in JVM tests
-        val device = mockk<WifiP2pDevice>(relaxed = true)
-        val state = MirrorState.DevicesFound(devices = listOf(device))
-        assertEquals(1, state.devices.size)
-        assertEquals(device, state.devices[0])
+    fun `Reconnecting is a singleton object`() {
+        val s1: MirrorState = MirrorState.Reconnecting
+        val s2: MirrorState = MirrorState.Reconnecting
+        assertEquals(s1, s2)
     }
 
     @Test
-    fun `DevicesFound with empty list is valid`() {
-        val state = MirrorState.DevicesFound(devices = emptyList())
-        assertTrue(state.devices.isEmpty())
+    fun `ReceiversFound carries receiver list`() {
+        val receiver = Receiver("PC", "192.168.1.5", 8765, TransportId.LAN)
+        val state = MirrorState.ReceiversFound(receivers = listOf(receiver))
+        assertEquals(1, state.receivers.size)
+        assertEquals(receiver, state.receivers[0])
     }
 
     @Test
-    fun `Error carries message and recoverable flag`() {
-        val recoverable = MirrorState.Error(message = "Retry available", recoverable = true)
-        val unrecoverable = MirrorState.Error(message = "Fatal error", recoverable = false)
+    fun `ReceiversFound with empty list is valid`() {
+        val state = MirrorState.ReceiversFound(receivers = emptyList())
+        assertTrue(state.receivers.isEmpty())
+    }
 
-        assertEquals("Retry available", recoverable.message)
+    @Test
+    fun `Error carries cause and recoverable flag`() {
+        val cause = MirrorError.HandshakeFailed("oops")
+        val recoverable = MirrorState.Error(cause = cause, recoverable = true)
+        val unrecoverable = MirrorState.Error(cause = cause, recoverable = false)
+
+        assertEquals(cause, recoverable.cause)
         assertTrue(recoverable.recoverable)
 
-        assertEquals("Fatal error", unrecoverable.message)
+        assertEquals(cause, unrecoverable.cause)
         assertFalse(unrecoverable.recoverable)
     }
 
@@ -80,21 +96,25 @@ class MirrorStateTest {
     fun `when expression covers all MirrorState subtypes`() {
         // Exhaustiveness check — fails to compile if a new subtype is added without updating this.
         fun label(state: MirrorState): String = when (state) {
-            is MirrorState.Idle -> "idle"
-            is MirrorState.Discovering -> "discovering"
-            is MirrorState.DevicesFound -> "devices_found"
-            is MirrorState.Connecting -> "connecting"
-            is MirrorState.AwaitingProjectionConsent -> "awaiting_consent"
-            is MirrorState.Streaming -> "streaming"
+            MirrorState.Idle -> "idle"
+            MirrorState.Discovering -> "discovering"
+            is MirrorState.ReceiversFound -> "receivers_found"
+            MirrorState.Connecting -> "connecting"
+            MirrorState.AwaitingPairing -> "awaiting_pairing"
+            MirrorState.AwaitingProjection -> "awaiting_projection"
+            MirrorState.Streaming -> "streaming"
+            MirrorState.Reconnecting -> "reconnecting"
             is MirrorState.Error -> "error"
         }
 
         assertEquals("idle", label(MirrorState.Idle))
         assertEquals("discovering", label(MirrorState.Discovering))
-        assertEquals("devices_found", label(MirrorState.DevicesFound(emptyList())))
+        assertEquals("receivers_found", label(MirrorState.ReceiversFound(emptyList())))
         assertEquals("connecting", label(MirrorState.Connecting))
-        assertEquals("awaiting_consent", label(MirrorState.AwaitingProjectionConsent))
+        assertEquals("awaiting_pairing", label(MirrorState.AwaitingPairing))
+        assertEquals("awaiting_projection", label(MirrorState.AwaitingProjection))
         assertEquals("streaming", label(MirrorState.Streaming))
-        assertEquals("error", label(MirrorState.Error("oops", false)))
+        assertEquals("reconnecting", label(MirrorState.Reconnecting))
+        assertEquals("error", label(MirrorState.Error(MirrorError.HandshakeFailed(""), false)))
     }
 }
