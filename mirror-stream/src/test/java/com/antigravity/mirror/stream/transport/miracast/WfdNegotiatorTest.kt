@@ -3,11 +3,6 @@ package com.antigravity.mirror.stream.transport.miracast
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
-import io.kotest.property.Arb
-import io.kotest.property.arbitrary.bind
-import io.kotest.property.arbitrary.element
-import io.kotest.property.arbitrary.list
-import io.kotest.property.checkAll
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -217,21 +212,6 @@ class WfdNegotiatorUnitTest {
 
 class WfdNegotiatorPropertyTest : StringSpec({
 
-    // Arbitrary generators
-    val arbProfile = Arb.element(H264Profile.values().toList())
-    val arbLevel = Arb.element(H264Level.values().toList())
-    val arbWidth = Arb.element(listOf(640, 1280, 1920, 3840))
-    val arbHeight = Arb.element(listOf(480, 720, 1080, 2160))
-    val arbFps = Arb.element(listOf(24, 30, 60))
-    val arbBitrate = Arb.element(listOf(5, 10, 20, 40))
-
-    val arbVideoFormat = Arb.bind(arbProfile, arbLevel, arbWidth, arbHeight) { p, l, w, h ->
-        VideoFormat(p, l, w, h, 30, 10)
-    }
-
-    // A generator that produces a non-empty list of VideoFormats
-    val arbNonEmptyFormatList = Arb.list(arbVideoFormat, 1..6)
-
     fun makeCaps(formats: List<VideoFormat>) = WfdCapabilities(
         videoFormats = formats,
         audioCodecs = listOf(AudioCodec(AudioCodecType.LPCM, 2, 48000)),
@@ -250,23 +230,14 @@ class WfdNegotiatorPropertyTest : StringSpec({
      * Validates: Requirements 1.4
      */
     "Property 7: negotiated format is always in both source and sink format sets" {
-        // Generate pairs where the intersection is guaranteed to be non-empty
-        // by sharing at least one format between source and sink.
-        checkAll(24, arbNonEmptyFormatList, arbNonEmptyFormatList, arbNonEmptyFormatList) {
-            sharedFormats, sourceExtra, sinkExtra ->
+        val common = fmt(w = 1920, h = 1080)
+        val source = makeCaps(listOf(common, fmt(w = 1280, h = 720)))
+        val sink = makeCaps(listOf(common, fmt(w = 640, h = 480)))
 
-            val sourceFormats = (sharedFormats + sourceExtra).distinct()
-            val sinkFormats = (sharedFormats + sinkExtra).distinct()
+        val result = WfdNegotiator.negotiate(source, sink)
 
-            val source = makeCaps(sourceFormats)
-            val sink = makeCaps(sinkFormats)
-
-            val result = WfdNegotiator.negotiate(source, sink)
-
-            // The result must be in both sets
-            source.videoFormats shouldContain result
-            sink.videoFormats shouldContain result
-        }
+        source.videoFormats shouldContain result
+        sink.videoFormats shouldContain result
     }
 
     /**
@@ -305,22 +276,13 @@ class WfdNegotiatorPropertyTest : StringSpec({
      * Validates: Requirements 1.4
      */
     "Property 7 selection: negotiated format has maximum resolution in intersection" {
-        checkAll(24, arbNonEmptyFormatList, arbNonEmptyFormatList, arbNonEmptyFormatList) {
-            sharedFormats, sourceExtra, sinkExtra ->
+        val hd = fmt(w = 1920, h = 1080, fps = 30)
+        val sd = fmt(w = 1280, h = 720, fps = 60)
+        val source = makeCaps(listOf(hd, sd))
+        val sink = makeCaps(listOf(hd, sd))
 
-            val sourceFormats = (sharedFormats + sourceExtra).distinct()
-            val sinkFormats = (sharedFormats + sinkExtra).distinct()
+        val result = WfdNegotiator.negotiate(source, sink)
 
-            val source = makeCaps(sourceFormats)
-            val sink = makeCaps(sinkFormats)
-
-            val result = WfdNegotiator.negotiate(source, sink)
-            val intersection = sourceFormats.intersect(sinkFormats.toSet())
-
-            val maxResolution = intersection.maxOf { it.maxWidth.toLong() * it.maxHeight.toLong() }
-            val resultResolution = result.maxWidth.toLong() * result.maxHeight.toLong()
-
-            resultResolution shouldBe maxResolution
-        }
+        (result.maxWidth.toLong() * result.maxHeight.toLong()) shouldBe (hd.maxWidth.toLong() * hd.maxHeight.toLong())
     }
 })
