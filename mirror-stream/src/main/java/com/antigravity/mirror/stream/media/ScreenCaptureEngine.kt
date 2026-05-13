@@ -1,4 +1,4 @@
-package com.antigravity.mirror.media
+package com.antigravity.mirror.stream.media
 
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
@@ -25,15 +25,17 @@ class ScreenCaptureEngine(
     private var virtualDisplay: VirtualDisplay? = null
 
     /**
-     * Callback wired by [com.antigravity.mirror.service.MirrorService] to forward encoded
-     * NAL units to [com.antigravity.mirror.protocol.RtpSender.sendNalUnit].
+     * Callback wired by the consumer (e.g. `MirrorService` in `app/`) to forward encoded
+     * NAL units to the active transport's sender (`RtpSender` for Miracast, the LAN
+     * protocol client for the LAN transport).
      */
     private var nalUnitCallback: ((ByteArray, Long) -> Unit)? = null
 
     /**
      * Registers the callback that receives encoded H.264 NAL units from [VideoEncoder].
      *
-     * Call this before [start] so that the encoder output is forwarded to [RtpSender].
+     * Call this before [start] so that the encoder output is forwarded to the active
+     * transport's sender.
      *
      * @param callback Invoked with (nalUnitBytes, presentationTimeUs) for each encoded NAL unit.
      */

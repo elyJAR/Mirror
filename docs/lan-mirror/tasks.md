@@ -43,7 +43,7 @@ Goal: a new Gradle module with the public API stubbed, no networking yet, no str
   - `Receiver.kt` (data class with `transport` field)
   - `MirrorError.kt` (sealed Exception hierarchy, see `design.md` §9; includes `MiracastBlocked` and `NoTransportAvailable` for selector use)
   - `MirrorClient.kt` — class with all public methods stubbed (throw `NotImplementedError`), exposing `state: StateFlow<MirrorState>` initialised to `Idle`.
-- [ ] **1.4 (A)** Move `media/ScreenCaptureEngine.kt` and `media/VideoEncoder.kt` into `mirror-stream/.../media/`. Update imports in `app/`. Tests follow. *(Deferred to a follow-up commit — needs coordinated import updates across `MirrorService`.)*
+- [x] **1.4 (A)** Move `media/ScreenCaptureEngine.kt` and `media/VideoEncoder.kt` into `mirror-stream/src/main/java/com/antigravity/mirror/stream/media/`. New package is `com.antigravity.mirror.stream.media`. Updated imports in `app/`: `MirrorService.kt` (2 lines) and `protocol/WfdSessionManager.kt` (1 line). No tests referenced these classes.
 - [ ] **1.5 (A)** Move the entire existing Miracast pipeline into `mirror-stream/.../transport/miracast/` **without changing behaviour**:
   - `discovery/DiscoveryManager.kt`
   - `protocol/RtspServer.kt`, `RtspParser.kt`, `WfdSessionManager.kt`, `WfdNegotiator.kt`, `RtpSender.kt`

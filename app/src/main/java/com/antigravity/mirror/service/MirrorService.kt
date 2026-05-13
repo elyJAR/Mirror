@@ -27,8 +27,8 @@ import com.antigravity.mirror.discovery.ConnectionEvent
 import com.antigravity.mirror.discovery.DiscoveryEvent
 import com.antigravity.mirror.discovery.DiscoveryManager
 import com.antigravity.mirror.discovery.REASON_WIFI_DISABLED
-import com.antigravity.mirror.media.ScreenCaptureEngine
-import com.antigravity.mirror.media.VideoEncoder
+import com.antigravity.mirror.stream.media.ScreenCaptureEngine
+import com.antigravity.mirror.stream.media.VideoEncoder
 import com.antigravity.mirror.protocol.RtpSender
 import com.antigravity.mirror.protocol.RtspServer
 import com.antigravity.mirror.protocol.SessionEvent

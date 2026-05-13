@@ -1,4 +1,4 @@
-package com.antigravity.mirror.media
+package com.antigravity.mirror.stream.media
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
