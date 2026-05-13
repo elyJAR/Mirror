@@ -10,6 +10,11 @@ import io.kotest.matchers.collections.shouldContainExactly
 import io.mockk.mockk
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import org.junit.After
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -24,12 +29,21 @@ class TransportSelectorTest {
     private lateinit var testDataStore: DataStore<Preferences>
     private lateinit var context: Context
 
+    private lateinit var dataStoreScope: CoroutineScope
+
     @Before
     fun setup() {
         context = mockk(relaxed = true)
+        dataStoreScope = CoroutineScope(Dispatchers.Unconfined + Job())
         testDataStore = PreferenceDataStoreFactory.create(
+            scope = dataStoreScope,
             produceFile = { tmpFolder.newFile("test.preferences_pb") }
         )
+    }
+
+    @After
+    fun teardown() {
+        dataStoreScope.cancel()
     }
 
     @Test
