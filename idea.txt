@@ -1,0 +1,1 @@
+i want to build an app that will allow me be able to mirror my android phone screen to my pc via wifi or wifi direct or hotspot. using the connect app (wireless display) on the PC directly regardless of the type of phone

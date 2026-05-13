@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Screen Mirror</string>
+    <string name="notification_title">Screen Mirror Active</string>
+    <string name="notification_text">Streaming your screen…</string>
+    <string name="btn_discover">Discover Devices</string>
+    <string name="btn_disconnect">Disconnect</string>
+    <string name="btn_retry">Retry</string>
+    <string name="label_discovering">Searching for devices…</string>
+    <string name="label_connecting">Connecting…</string>
+    <string name="label_streaming">Streaming</string>
+    <string name="label_no_devices">No devices found</string>
+    <string name="label_awaiting_consent">Waiting for screen capture permission…</string>
+    <string name="error_wifi_disabled">WiFi is disabled. Please enable WiFi to discover devices.</string>
+    <string name="error_wifi_direct_unsupported">This device does not support WiFi Direct.</string>
+    <string name="error_projection_denied">Screen capture permission was denied.</string>
+    <string name="permission_rationale_location">Location permission is required for WiFi Direct device discovery on this Android version.</string>
+    <string name="permission_rationale_nearby_wifi">Nearby WiFi Devices permission is required to discover Miracast receivers.</string>
+    <string name="settings_open">Open Settings</string>
+    <string name="pin_dialog_title">Enter PIN</string>
+    <string name="pin_dialog_hint">PIN</string>
+    <string name="pin_dialog_ok">Connect</string>
+    <string name="pin_dialog_cancel">Cancel</string>
+    <string name="error_incorrect_pin">Incorrect PIN. Please try again.</string>
+</resources>
