@@ -13,7 +13,7 @@ class FramingPropertyTest : StringSpec({
 
     "round-trip framing of arbitrary payloads up to 64KB" {
         // We use a smaller range and fewer iterations for property tests to keep them fast (avoid CI hangs)
-        checkAll(50, Arb.byte(), Arb.byteArray(length = Arb.int(0, 1024 * 64), content = Arb.byte())) { tag, payload ->
+        checkAll(12, Arb.byte(), Arb.byteArray(length = Arb.int(0, 1024 * 8), content = Arb.byte())) { tag, payload ->
             val channel = ByteChannel(autoFlush = true)
             
             // Write

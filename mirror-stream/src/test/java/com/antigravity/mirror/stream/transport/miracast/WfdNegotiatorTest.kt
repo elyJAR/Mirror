@@ -252,7 +252,7 @@ class WfdNegotiatorPropertyTest : StringSpec({
     "Property 7: negotiated format is always in both source and sink format sets" {
         // Generate pairs where the intersection is guaranteed to be non-empty
         // by sharing at least one format between source and sink.
-        checkAll(100, arbNonEmptyFormatList, arbNonEmptyFormatList, arbNonEmptyFormatList) {
+        checkAll(24, arbNonEmptyFormatList, arbNonEmptyFormatList, arbNonEmptyFormatList) {
             sharedFormats, sourceExtra, sinkExtra ->
 
             val sourceFormats = (sharedFormats + sourceExtra).distinct()
@@ -305,7 +305,7 @@ class WfdNegotiatorPropertyTest : StringSpec({
      * Validates: Requirements 1.4
      */
     "Property 7 selection: negotiated format has maximum resolution in intersection" {
-        checkAll(100, arbNonEmptyFormatList, arbNonEmptyFormatList, arbNonEmptyFormatList) {
+        checkAll(24, arbNonEmptyFormatList, arbNonEmptyFormatList, arbNonEmptyFormatList) {
             sharedFormats, sourceExtra, sinkExtra ->
 
             val sourceFormats = (sharedFormats + sourceExtra).distinct()

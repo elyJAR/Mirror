@@ -70,7 +70,7 @@ dependencies {
 tasks.withType(Test) {
     useJUnitPlatform()
     
-    // Prevent tests from hanging indefinitely — max 2 minutes per test task
-    // Individual tests are protected by @Timeout rules
-    timeout = java.time.Duration.ofMinutes(2)
+    // Give the unit-test task enough room for the property-based tests to finish.
+    // Individual tests still need to complete within a reasonable CI window.
+    timeout = java.time.Duration.ofMinutes(5)
 }
