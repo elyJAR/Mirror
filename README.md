@@ -18,11 +18,13 @@ The app picks the right transport automatically and falls back gracefully on dev
 - **Dual transport** with automatic selection and fallback
   - **Miracast** — to Windows *Connect*, smart TVs, Miracast dongles
   - **LAN** — to a custom PC receiver (Electron + WebCodecs)
+- **High-Performance Video** — H.264 and HEVC (H.265) support with hardware acceleration
+- **Synchronized Audio** — Stereo AAC audio streaming
+- **PIN Pairing** — Secure connection establishment via 4-digit PIN
 - **Three IP-network modes** (used by both transports where applicable)
   - Same Wi-Fi network (router)
   - Phone hotspot (PC connects to phone's hotspot)
   - PC hotspot (phone connects to PC's hosted network)
-- **Hardware-accelerated H.264 encoding** via `MediaCodec`
 - **Foreground service** keeps the mirror session alive when the app is backgrounded
 - **Device discovery UI** — mDNS for LAN, Wi-Fi Direct peer discovery for Miracast
 - **Graceful error handling** with descriptive messages and retry options
@@ -110,8 +112,8 @@ Active development. v1.0.0-pre is now available with full LAN transport support.
 - [x] Phase 2: implement LAN transport (TCP framing, JSON control, NAL streaming).
 - [x] Phase 3–4: mDNS discovery + Electron PC receiver.
 - [x] Phase 5–7: UI polish, hardening, integration story for the sibling project.
-- [x] v1.0.0-pre release.
-- [ ] v2.0: Audio support, pairing PIN, H.265/AV1.
+- [x] v1.0.0-pre release (with PIN authentication and Audio support).
+- [ ] v2.0: Noise-protocol session encryption, Input back-channel (Touch-back).
 
 ---
 

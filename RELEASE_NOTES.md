@@ -7,14 +7,15 @@ Mirror is a low-latency, high-performance screen mirroring solution for local ne
 
 ## Key Features
 - **Zero-Config Discovery**: Automatic PC detection via mDNS.
-- **Low Latency**: Optimized H.264 pipeline with WebCodecs for sub-100ms glass-to-glass delay.
+- **Secure Pairing**: Interactive 4-digit PIN authentication to prevent unauthorized connections.
+- **Low Latency**: Optimized H.264/HEVC pipeline with WebCodecs for sub-100ms glass-to-glass delay.
+- **Audio Support**: Stereo audio streaming (AAC) with synchronized playback.
 - **Congestion Control**: Dynamic bitrate adaptation and backpressure handling to maintain stability on busy Wi-Fi networks.
 - **Developer Friendly**: 10-line integration for Android apps.
 
 ## ⚠️ Important Limitations
 - **LAN-Only**: This version is designed for use on local networks. Discovery and streaming will not work across the public internet or complex firewalls without a VPN.
-- **Unencrypted**: The wire protocol is currently unencrypted. Do not use this over untrusted public Wi-Fi networks.
-- **No Audio**: v1 supports video mirroring only. Audio support is planned for v2.
+- **Authenticated but Unencrypted**: Connection is secured by a PIN, but the raw video/audio stream is currently unencrypted. Do not use this over untrusted public Wi-Fi networks.
 - **No Input Back-channel**: You cannot control the phone from the PC in this version.
 
 ## Quick Start
@@ -26,7 +27,8 @@ Mirror is a low-latency, high-performance screen mirroring solution for local ne
 ### In your Android App:
 1. Grant the screen capture permission when prompted.
 2. Select your PC from the discovery list.
-3. Long-press the "Streaming" status bar to view performance metrics.
+3. Enter the 4-digit PIN displayed on the PC.
+4. Long-press the "Streaming" status bar to view performance metrics.
 
 ## License
 MIT License
