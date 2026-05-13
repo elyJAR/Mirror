@@ -8,7 +8,8 @@
 -keepattributes InnerClasses
 
 # Keep data model classes (used in serialisation / reflection)
--keep class com.antigravity.mirror.model.** { *; }
+-keep class com.antigravity.mirror.stream.transport.miracast.** { *; }
+-keep class com.antigravity.mirror.stream.api.** { *; }
 -keep class com.antigravity.mirror.error.** { *; }
 -keep class com.antigravity.mirror.service.MirrorState { *; }
 

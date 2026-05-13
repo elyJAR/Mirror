@@ -1,4 +1,4 @@
-package com.antigravity.mirror.model
+package com.antigravity.mirror.stream.transport.miracast
 
 /**
  * Represents a parsed WFD RTSP request received from the Miracast sink.

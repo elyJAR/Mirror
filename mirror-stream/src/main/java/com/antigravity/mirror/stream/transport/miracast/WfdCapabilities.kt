@@ -1,4 +1,4 @@
-package com.antigravity.mirror.model
+package com.antigravity.mirror.stream.transport.miracast
 
 /**
  * Represents the negotiated WFD parameters exchanged during the RTSP M3/M4 handshake.

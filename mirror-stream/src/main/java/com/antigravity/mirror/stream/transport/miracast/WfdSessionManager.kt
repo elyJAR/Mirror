@@ -1,9 +1,8 @@
-package com.antigravity.mirror.protocol
+package com.antigravity.mirror.stream.transport.miracast
 
 import android.media.projection.MediaProjection
 import android.util.Log
 import com.antigravity.mirror.stream.media.ScreenCaptureEngine
-import com.antigravity.mirror.model.RtspResponse
 import kotlinx.coroutines.channels.ProducerScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow

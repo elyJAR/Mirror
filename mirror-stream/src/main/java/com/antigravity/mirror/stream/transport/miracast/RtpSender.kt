@@ -1,4 +1,4 @@
-package com.antigravity.mirror.protocol
+package com.antigravity.mirror.stream.transport.miracast
 
 import java.net.DatagramPacket
 import java.net.DatagramSocket

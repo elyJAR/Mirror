@@ -1,6 +1,5 @@
-package com.antigravity.mirror.protocol
+package com.antigravity.mirror.stream.transport.miracast
 
-import com.antigravity.mirror.model.RtspMessage
 import java.util.TreeMap
 
 /**

@@ -1,18 +1,11 @@
-package com.antigravity.mirror.protocol
+package com.antigravity.mirror.stream.transport.miracast
 
-import com.antigravity.mirror.model.AudioCodec
-import com.antigravity.mirror.model.AudioCodecType
-import com.antigravity.mirror.model.H264Level
-import com.antigravity.mirror.model.H264Profile
-import com.antigravity.mirror.model.VideoFormat
-import com.antigravity.mirror.model.WfdCapabilities
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.element
-import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.checkAll
 import org.junit.Assert.assertEquals

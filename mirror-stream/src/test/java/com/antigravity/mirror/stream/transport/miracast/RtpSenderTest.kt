@@ -1,4 +1,4 @@
-package com.antigravity.mirror.protocol
+package com.antigravity.mirror.stream.transport.miracast
 
 import org.junit.After
 import org.junit.Assert.assertEquals

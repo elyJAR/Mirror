@@ -1,8 +1,4 @@
-package com.antigravity.mirror.protocol
-
-import com.antigravity.mirror.model.H264Profile
-import com.antigravity.mirror.model.VideoFormat
-import com.antigravity.mirror.model.WfdCapabilities
+package com.antigravity.mirror.stream.transport.miracast
 
 /**
  * Negotiates the best compatible [VideoFormat] between a WFD source and sink.

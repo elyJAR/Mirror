@@ -1,4 +1,4 @@
-package com.antigravity.mirror.discovery
+package com.antigravity.mirror.stream.transport.miracast
 
 import android.content.BroadcastReceiver
 import android.content.Context

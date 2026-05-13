@@ -1,8 +1,6 @@
-package com.antigravity.mirror.protocol
+package com.antigravity.mirror.stream.transport.miracast
 
 import android.util.Log
-import com.antigravity.mirror.model.RtspMessage
-import com.antigravity.mirror.model.RtspResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow

@@ -44,17 +44,17 @@ Goal: a new Gradle module with the public API stubbed, no networking yet, no str
   - `MirrorError.kt` (sealed Exception hierarchy, see `design.md` §9; includes `MiracastBlocked` and `NoTransportAvailable` for selector use)
   - `MirrorClient.kt` — class with all public methods stubbed (throw `NotImplementedError`), exposing `state: StateFlow<MirrorState>` initialised to `Idle`.
 - [x] **1.4 (A)** Move `media/ScreenCaptureEngine.kt` and `media/VideoEncoder.kt` into `mirror-stream/src/main/java/com/antigravity/mirror/stream/media/`. New package is `com.antigravity.mirror.stream.media`. Updated imports in `app/`: `MirrorService.kt` (2 lines) and `protocol/WfdSessionManager.kt` (1 line). No tests referenced these classes.
-- [ ] **1.5 (A)** Move the entire existing Miracast pipeline into `mirror-stream/.../transport/miracast/` **without changing behaviour**:
-  - `discovery/DiscoveryManager.kt`
-  - `protocol/RtspServer.kt`, `RtspParser.kt`, `WfdSessionManager.kt`, `WfdNegotiator.kt`, `RtpSender.kt`
-  - `model/RtspMessage.kt`, `WfdCapabilities.kt`
-  - matching tests in `app/src/test/` move to `mirror-stream/src/test/`
-  - existing `MirrorService` orchestration logic is **temporarily** kept in `app/` until Phase 2 — it will be split between transport-agnostic session code (moves to `stream/session/`) and the Miracast-specific `WfdSessionManager` (already in `transport/miracast/`).
-  *(Deferred to a follow-up commit — high coupling with `MirrorService`.)*
+- [x] **1.5 (A)** Moved the entire existing Miracast pipeline into `mirror-stream/src/main/java/com/antigravity/mirror/stream/transport/miracast/` (flat package, no behaviour change):
+  - `DiscoveryManager.kt` (with `DiscoveryEvent`, `ConnectionEvent`, `REASON_WIFI_DISABLED`)
+  - `RtspServer.kt`, `RtspParser.kt`, `WfdSessionManager.kt` (with `SessionEvent`), `WfdNegotiator.kt`, `RtpSender.kt`
+  - `RtspMessage.kt` (with `RtspResponse`), `WfdCapabilities.kt` (with `VideoFormat`, `H264Profile`, `H264Level`, `AudioCodec`, `AudioCodecType`), `MirrorSession.kt`
+  - Tests `DataModelsTest.kt`, `RtpSenderTest.kt`, `WfdNegotiatorTest.kt` moved to `mirror-stream/src/test/java/com/antigravity/mirror/stream/transport/miracast/`.
+  - `MirrorService.kt` imports updated to the new packages. `proguard-rules.pro` updated.
+  - `MirrorService` orchestration stays in `app/` until Phase 2 — it will be split between transport-agnostic session code (moves to `stream/session/`) and the Miracast-specific `WfdSessionManager` (now in `transport/miracast/`).
 - [x] **1.6 (A)** Add a smoke unit test for the public API surface (`MirrorApiSmokeTest.kt`) covering `MirrorConfig` defaults, `MirrorState` value semantics, `MirrorError` subtypes, and `Receiver` equality. Constructing `MirrorClient` itself needs a `Context` mock and is deferred until §1.5.6 wires real transports.
 - [x] **1.7 (D)** CI: `./gradlew test` already traverses all subprojects, so module test execution is automatic. Updated test-results upload to also collect `mirror-stream/build/reports/tests/`.
 
-**Phase 1 status:** skeleton + API stubs landed (1.1, 1.2, 1.3, 1.6, 1.7 ✅). File moves (1.4, 1.5) deferred to follow-up commits because they require coordinated import updates across the existing `app/` module and would balloon a single commit's blast radius.
+**Phase 1 done:** all sub-tasks complete. `mirror-stream` library now owns the entire encode + Miracast pipeline; `app/` is a thin UI/orchestration shell that depends on it.
 
 ---
 

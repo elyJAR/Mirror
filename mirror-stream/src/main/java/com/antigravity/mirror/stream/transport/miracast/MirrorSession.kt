@@ -1,4 +1,4 @@
-package com.antigravity.mirror.model
+package com.antigravity.mirror.stream.transport.miracast
 
 import android.net.wifi.p2p.WifiP2pDevice
 import java.net.InetAddress
