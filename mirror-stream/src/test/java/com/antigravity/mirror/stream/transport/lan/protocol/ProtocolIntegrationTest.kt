@@ -62,6 +62,8 @@ class ProtocolIntegrationTest {
                 receiverJob.await()
             }
         } finally {
+            clientJob.cancel()
+            receiverJob.cancel()
             client.close()
         }
     }
