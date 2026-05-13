@@ -19,9 +19,14 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
+import org.junit.rules.Timeout
+import java.util.concurrent.TimeUnit
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TransportSelectorTest {
+
+    @get:Rule
+    val timeout = Timeout(10, TimeUnit.SECONDS)
 
     @get:Rule
     val tmpFolder = TemporaryFolder()

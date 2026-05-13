@@ -86,4 +86,7 @@ dependencies {
 // Enable JUnit 5 for Kotest
 tasks.withType(Test) {
     useJUnitPlatform()
+    
+    // Prevent tests from hanging indefinitely — each test gets a max of 30 seconds
+    timeout = java.time.Duration.ofSeconds(30)
 }

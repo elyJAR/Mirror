@@ -5,10 +5,17 @@ import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.Timeout
 import java.net.ServerSocket
+import java.util.concurrent.TimeUnit
 
 class ProtocolIntegrationTest {
+
+    @get:Rule
+    val timeout = Timeout(30, TimeUnit.SECONDS)
 
     private fun findFreePort(): Int {
         return ServerSocket(0).use { it.localPort }

@@ -5,10 +5,13 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.Timeout
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
+import java.util.concurrent.TimeUnit
 
 /**
  * Unit tests for [RtpSender] packetisation logic.
@@ -24,6 +27,9 @@ import java.net.InetAddress
  */
 class RtpSenderTest {
 
+    @get:Rule
+    val timeout = Timeout(10, TimeUnit.SECONDS)
+
     private val localhost: InetAddress = InetAddress.getLoopbackAddress()
     private lateinit var receiverSocket: DatagramSocket
     private var receiverPort: Int = 0
@@ -33,7 +39,7 @@ class RtpSenderTest {
         // Bind a receiver socket on a random port to capture sent packets
         receiverSocket = DatagramSocket(0, localhost)
         receiverPort = receiverSocket.localPort
-        receiverSocket.soTimeout = 2000 // 2-second timeout for receives
+        receiverSocket.soTimeout = 1000 // 1-second timeout for receives (reduced from 2s for faster tests)
     }
 
     @After
