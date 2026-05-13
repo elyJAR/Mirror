@@ -1,0 +1,64 @@
+plugins {
+    id 'com.android.library'
+    id 'org.jetbrains.kotlin.android'
+}
+
+android {
+    namespace 'com.antigravity.mirror.stream'
+    compileSdk 34
+
+    defaultConfig {
+        minSdk 21
+        // Library is consumable on the same range as the app; tests target API 34 conventions.
+        consumerProguardFiles 'consumer-rules.pro'
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            consumerProguardFiles 'consumer-rules.pro'
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    kotlinOptions {
+        jvmTarget = '1.8'
+    }
+
+    testOptions {
+        unitTests {
+            // Keep JVM unit tests permissive of stubbed Android framework calls.
+            returnDefaultValues = true
+        }
+    }
+}
+
+dependencies {
+    // Kotlin coroutines (state flows, channels)
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3'
+
+    // AndroidX core for Context-light helpers
+    implementation 'androidx.core:core-ktx:1.12.0'
+
+    // Unit testing
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3'
+
+    // Kotest (property-based testing)
+    testImplementation 'io.kotest:kotest-runner-junit5:5.8.0'
+    testImplementation 'io.kotest:kotest-assertions-core:5.8.0'
+    testImplementation 'io.kotest:kotest-property:5.8.0'
+
+    // Mockk for mocking in tests
+    testImplementation 'io.mockk:mockk:1.13.9'
+}
+
+// Enable JUnit 5 for Kotest
+tasks.withType(Test) {
+    useJUnitPlatform()
+}

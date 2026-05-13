@@ -15,3 +15,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "AndroidScreenMirror"
 include ':app'
+include ':mirror-stream'

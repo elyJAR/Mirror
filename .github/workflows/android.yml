@@ -59,7 +59,9 @@ jobs:
         if: always()
         with:
           name: test-results
-          path: app/build/reports/tests/
+          path: |
+            app/build/reports/tests/
+            mirror-stream/build/reports/tests/
           retention-days: 7
 
 # ---------------------------------------------------------------------------

@@ -19,13 +19,13 @@ Where requirements (`Rx.x`) and design (`Dx`) IDs are referenced, they map to se
 
 Preserve everything that exists today. The Miracast pipeline stays — it'll work on devices where the OEM allows it, and become one of two transports behind the same `MirrorClient` API.
 
-- [ ] **0.1 (A)** Keep all existing code in `app/src/main/java/com/antigravity/mirror/{media,protocol,discovery,service,model,error}` — nothing is deleted in this phase.
-- [ ] **0.2 (D)** Tag current `main` as `v0.1-miracast-only` so the pre-pivot snapshot is easy to recover.
-- [ ] **0.3 (D)** Update `README.md`:
+- [x] **0.1 (A)** Keep all existing code in `app/src/main/java/com/antigravity/mirror/{media,protocol,discovery,service,model,error}` — nothing is deleted in this phase.
+- [x] **0.2 (D)** Tag current `main` as `v0.1-miracast-only` so the pre-pivot snapshot is easy to recover.
+- [x] **0.3 (D)** Update `README.md`:
   - Lead with the dual-transport story.
   - Document that Miracast works on a subset of devices (mostly older or non-Samsung) and LAN works everywhere.
   - Link to `docs/lan-mirror/` for the LAN spec, and keep `.kiro/specs/android-screen-mirror/` (gitignored) as the Miracast spec.
-- [ ] **0.4 (D)** `.kiro/` continues to be gitignored; new docs at `docs/lan-mirror/` are committed.
+- [x] **0.4 (D)** `.kiro/` continues to be gitignored; new docs at `docs/lan-mirror/` are committed.
 
 **Phase 0 done when:** repo is tagged, README reflects the dual-transport plan, no code has been moved yet.
 
@@ -35,25 +35,26 @@ Preserve everything that exists today. The Miracast pipeline stays — it'll wor
 
 Goal: a new Gradle module with the public API stubbed, no networking yet, no streaming. The `app/` module depends on it and compiles.
 
-- [ ] **1.1 (A)** Create new module `mirror-stream` (Android library, `com.android.library` plugin). `applicationId` is removed; `namespace = com.antigravity.mirror.stream`.
-- [ ] **1.2 (A)** Wire `app/build.gradle` to `implementation project(':mirror-stream')`. Update `settings.gradle` to include it.
-- [ ] **1.3 (A)** Create the public API package `com.antigravity.mirror.stream.api`:
-  - `MirrorConfig.kt` (data class, see `design.md` §5)
+- [x] **1.1 (A)** Create new module `mirror-stream` (Android library, `com.android.library` plugin). `applicationId` is removed; `namespace = com.antigravity.mirror.stream`.
+- [x] **1.2 (A)** Wire `app/build.gradle` to `implementation project(':mirror-stream')`. Update `settings.gradle` to include it.
+- [x] **1.3 (A)** Create the public API package `com.antigravity.mirror.stream.api`:
+  - `MirrorConfig.kt` (data class, see `design.md` §5) — includes `Codec` and `Transport` enums.
   - `MirrorState.kt` (sealed interface)
-  - `Receiver.kt` (data class)
-  - `MirrorError.kt` (sealed Exception hierarchy, see `design.md` §9)
-  - `MirrorClient.kt` — class with all public methods stubbed `TODO()`, exposing `state: StateFlow<MirrorState>`.
-- [ ] **1.4 (A)** Move `media/ScreenCaptureEngine.kt` and `media/VideoEncoder.kt` into `mirror-stream/.../media/`. Update imports in `app/`. Tests follow.
+  - `Receiver.kt` (data class with `transport` field)
+  - `MirrorError.kt` (sealed Exception hierarchy, see `design.md` §9; includes `MiracastBlocked` and `NoTransportAvailable` for selector use)
+  - `MirrorClient.kt` — class with all public methods stubbed (throw `NotImplementedError`), exposing `state: StateFlow<MirrorState>` initialised to `Idle`.
+- [ ] **1.4 (A)** Move `media/ScreenCaptureEngine.kt` and `media/VideoEncoder.kt` into `mirror-stream/.../media/`. Update imports in `app/`. Tests follow. *(Deferred to a follow-up commit — needs coordinated import updates across `MirrorService`.)*
 - [ ] **1.5 (A)** Move the entire existing Miracast pipeline into `mirror-stream/.../transport/miracast/` **without changing behaviour**:
   - `discovery/DiscoveryManager.kt`
   - `protocol/RtspServer.kt`, `RtspParser.kt`, `WfdSessionManager.kt`, `WfdNegotiator.kt`, `RtpSender.kt`
   - `model/RtspMessage.kt`, `WfdCapabilities.kt`
   - matching tests in `app/src/test/` move to `mirror-stream/src/test/`
   - existing `MirrorService` orchestration logic is **temporarily** kept in `app/` until Phase 2 — it will be split between transport-agnostic session code (moves to `stream/session/`) and the Miracast-specific `WfdSessionManager` (already in `transport/miracast/`).
-- [ ] **1.6 (A)** Add a smoke unit test that constructs `MirrorClient` with a mocked `Context` and asserts initial state is `Idle`.
-- [ ] **1.7 (D)** Update `.github/workflows/android.yml` so the CI build runs `:mirror-stream:assembleDebug` and `:mirror-stream:test` in addition to `:app`.
+  *(Deferred to a follow-up commit — high coupling with `MirrorService`.)*
+- [x] **1.6 (A)** Add a smoke unit test for the public API surface (`MirrorApiSmokeTest.kt`) covering `MirrorConfig` defaults, `MirrorState` value semantics, `MirrorError` subtypes, and `Receiver` equality. Constructing `MirrorClient` itself needs a `Context` mock and is deferred until §1.5.6 wires real transports.
+- [x] **1.7 (D)** CI: `./gradlew test` already traverses all subprojects, so module test execution is automatic. Updated test-results upload to also collect `mirror-stream/build/reports/tests/`.
 
-**Phase 1 done when:** CI compiles both modules; existing Miracast tests still pass after the move; smoke test on the new `MirrorClient` passes. No public-API behaviour change yet.
+**Phase 1 status:** skeleton + API stubs landed (1.1, 1.2, 1.3, 1.6, 1.7 ✅). File moves (1.4, 1.5) deferred to follow-up commits because they require coordinated import updates across the existing `app/` module and would balloon a single commit's blast radius.
 
 ---
 
