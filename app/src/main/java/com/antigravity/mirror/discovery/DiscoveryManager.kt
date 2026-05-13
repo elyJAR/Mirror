@@ -238,11 +238,11 @@ class DiscoveryManager(private val context: Context) {
                 }
             }
             override fun onFailure(reason: Int) {
-                Log.e(TAG, "connect() failed with reason: $reason")
-                if (!channel.isClosedForSend) {
-                    channel.trySend(ConnectionEvent.Failed(reason))
-                    channel.close()
-                }
+                // NOTE: Android frequently calls onFailure(ERROR=0) even when the connection
+                // actually succeeds in the background. Do NOT treat this as fatal — just log
+                // it and let the WIFI_P2P_CONNECTION_CHANGED_ACTION broadcast be the source
+                // of truth. The 30-second timeout will handle genuine failures.
+                Log.w(TAG, "connect() onFailure(reason=$reason) — continuing to wait for broadcast (may still succeed)")
             }
         })
     }
