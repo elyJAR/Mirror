@@ -10,14 +10,12 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.property.Arb
+import io.kotest.property.arbitrary.bind
 import io.kotest.property.arbitrary.element
 import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
-import io.kotest.property.arbitrary.map
-import io.kotest.property.arbitrary.pair
 import io.kotest.property.checkAll
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
@@ -234,7 +232,7 @@ class WfdNegotiatorPropertyTest : StringSpec({
     val arbFps = Arb.element(listOf(24, 30, 60))
     val arbBitrate = Arb.element(listOf(5, 10, 20, 40))
 
-    val arbVideoFormat = Arb.map(arbProfile, arbLevel, arbWidth, arbHeight) { p, l, w, h ->
+    val arbVideoFormat = Arb.bind(arbProfile, arbLevel, arbWidth, arbHeight) { p, l, w, h ->
         VideoFormat(p, l, w, h, 30, 10)
     }
 
