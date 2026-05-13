@@ -176,9 +176,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        Intent(this, MirrorService::class.java).also { intent ->
-            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
-        }
+        // Start the service explicitly so onStartCommand runs and startForeground is called,
+        // then bind to get the Binder reference. BIND_AUTO_CREATE alone never calls onStartCommand.
+        val serviceIntent = Intent(this, MirrorService::class.java)
+        startService(serviceIntent)
+        bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     override fun onStop() {
@@ -482,7 +484,17 @@ class MainActivity : AppCompatActivity() {
             checkAndRequestPermissions()
             return
         }
-        mirrorService?.startDiscovery()
+        val service = mirrorService
+        if (service == null) {
+            Log.w(TAG, "onDiscoverClicked: service not yet bound, retrying bind")
+            // Service not connected yet — re-trigger bind and show a brief status
+            statusText.text = "Starting service…"
+            statusText.visibility = View.VISIBLE
+            startService(Intent(this, MirrorService::class.java))
+            bindService(Intent(this, MirrorService::class.java), serviceConnection, Context.BIND_AUTO_CREATE)
+            return
+        }
+        service.startDiscovery()
     }
 
     /** Called when the user selects a device from the list. */

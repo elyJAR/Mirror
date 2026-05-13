@@ -24,6 +24,7 @@ import com.antigravity.mirror.R
 import com.antigravity.mirror.discovery.ConnectionEvent
 import com.antigravity.mirror.discovery.DiscoveryEvent
 import com.antigravity.mirror.discovery.DiscoveryManager
+import com.antigravity.mirror.discovery.REASON_WIFI_DISABLED
 import com.antigravity.mirror.media.ScreenCaptureEngine
 import com.antigravity.mirror.media.VideoEncoder
 import com.antigravity.mirror.protocol.RtpSender
@@ -152,12 +153,18 @@ class MirrorService : Service() {
      */
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = buildNotification()
+        // Use FOREGROUND_SERVICE_TYPE_SPECIAL_USE (API 34) or no type (older APIs) at startup.
+        // We must NOT use FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION here because that type
+        // requires an active MediaProjection token — we don't have one yet at service start.
+        // The service is promoted to mediaProjection type in onProjectionGranted().
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // API 29+: startForeground requires a valid type. Use DATA_SYNC as a neutral
+            // placeholder — it doesn't require any special token.
             ServiceCompat.startForeground(
                 this,
                 NOTIFICATION_ID,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
             )
         } else {
             startForeground(NOTIFICATION_ID, notification)
@@ -291,6 +298,19 @@ class MirrorService : Service() {
         }
 
         Log.i(TAG, "onProjectionGranted: creating streaming components, sinkAddress=$sinkAddress")
+
+        // Promote the foreground service to mediaProjection type now that we have a token.
+        // This is required on API 29+ — the type must match the actual usage.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            runCatching {
+                ServiceCompat.startForeground(
+                    this,
+                    NOTIFICATION_ID,
+                    buildNotification(),
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION
+                )
+            }.onFailure { Log.w(TAG, "Failed to promote to mediaProjection type: ${it.message}") }
+        }
 
         // Create all streaming components
         val encoder = VideoEncoder(
@@ -521,6 +541,7 @@ class MirrorService : Service() {
      *               [WifiP2pManager.P2P_UNSUPPORTED] (2).
      */
     private fun mapWifiP2pReasonToMessage(reason: Int): String = when (reason) {
+        REASON_WIFI_DISABLED -> "WiFi is disabled. Please enable WiFi to discover devices."
         WifiP2pManager.ERROR -> "Wi-Fi Direct error. Please try again."
         WifiP2pManager.BUSY -> "Wi-Fi Direct is busy. Please try again."
         WifiP2pManager.P2P_UNSUPPORTED -> "Wi-Fi Direct is not supported on this device."

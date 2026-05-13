@@ -14,11 +14,15 @@ import android.util.Log
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import java.net.InetAddress
 
 private const val TAG = "MirrorApp/DiscoveryManager"
 private const val DISCOVERY_TIMEOUT_MS = 30_000L
+
+/** Synthetic reason code used when WiFi is disabled (not a WifiP2pManager code). */
+const val REASON_WIFI_DISABLED = -100
 
 /**
  * Wraps [WifiP2pManager] and its [WifiP2pManager.Channel].
@@ -55,34 +59,35 @@ class DiscoveryManager(private val context: Context) {
      * (along with stopping discovery) when the flow is cancelled or completes.
      */
     fun startDiscovery(): Flow<DiscoveryEvent> = callbackFlow {
-        // Check WiFi is enabled
+        // Check WiFi is enabled — emit a typed error instead of throwing
         @Suppress("DEPRECATION")
         if (!wifiManager.isWifiEnabled) {
-            close(IllegalStateException("WiFi is disabled"))
+            Log.w(TAG, "startDiscovery: WiFi is disabled")
+            trySend(DiscoveryEvent.DiscoveryFailed(REASON_WIFI_DISABLED))
+            close()
             return@callbackFlow
         }
 
         // Check WiFi Direct is supported
         if (!isWifiDirectSupported()) {
+            Log.w(TAG, "startDiscovery: WiFi Direct not supported")
             trySend(DiscoveryEvent.DiscoveryFailed(WifiP2pManager.P2P_UNSUPPORTED))
             close()
             return@callbackFlow
         }
 
-        // BroadcastReceiver to handle peer and connection change events
+        // BroadcastReceiver to handle peer change events
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                when (intent.action) {
-                    WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
-                        @Suppress("DEPRECATION")
-                        wifiP2pManager.requestPeers(p2pChannel) { peerList ->
-                            val peers = peerList.deviceList.toList()
-                            if (peers.isNotEmpty()) {
-                                trySend(DiscoveryEvent.PeersFound(peers))
-                            } else {
-                                trySend(DiscoveryEvent.NoPeersFound)
-                            }
+                if (intent.action == WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION) {
+                    @Suppress("DEPRECATION")
+                    wifiP2pManager.requestPeers(p2pChannel) { peerList ->
+                        val peers = peerList.deviceList.toList()
+                        Log.d(TAG, "Peers changed: ${peers.size} peer(s)")
+                        if (peers.isNotEmpty()) {
+                            trySend(DiscoveryEvent.PeersFound(peers))
                         }
+                        // Don't emit NoPeersFound here — wait for the timeout
                     }
                 }
             }
@@ -90,46 +95,45 @@ class DiscoveryManager(private val context: Context) {
 
         val intentFilter = IntentFilter().apply {
             addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION)
-            addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION)
         }
         context.registerReceiver(receiver, intentFilter)
 
         // Start peer discovery
-        val actionListener = object : WifiP2pManager.ActionListener {
+        wifiP2pManager.discoverPeers(p2pChannel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d(TAG, "discoverPeers initiated successfully")
             }
-
             override fun onFailure(reason: Int) {
                 Log.e(TAG, "discoverPeers failed with reason: $reason")
                 trySend(DiscoveryEvent.DiscoveryFailed(reason))
                 close()
             }
+        })
+
+        // Run a 30-second timeout in a child coroutine. When it fires, emit NoPeersFound
+        // and close the flow. This is separate from awaitClose so the receiver cleanup
+        // always runs regardless of whether the timeout or a peer event closes the flow.
+        val timeoutJob = launch {
+            withTimeoutOrNull(DISCOVERY_TIMEOUT_MS) {
+                // Just suspend — the timeout cancels this coroutine after 30s
+                kotlinx.coroutines.delay(DISCOVERY_TIMEOUT_MS)
+            }
+            // If we reach here the timeout elapsed without the flow being closed
+            if (!isClosedForSend) {
+                Log.i(TAG, "Discovery timed out — no peers found")
+                trySend(DiscoveryEvent.NoPeersFound)
+                close()
+            }
         }
 
-        wifiP2pManager.discoverPeers(p2pChannel, actionListener)
-
-        // Apply 30-second timeout — emit NoPeersFound if nothing arrives in time
-        withTimeoutOrNull(DISCOVERY_TIMEOUT_MS) {
-            // Suspend until the flow is closed (by awaitClose or by the caller cancelling)
-            awaitClose {
-                stopDiscovery()
-                try {
-                    context.unregisterReceiver(receiver)
-                } catch (e: IllegalArgumentException) {
-                    Log.w(TAG, "Receiver already unregistered", e)
-                }
-            }
-        } ?: run {
-            // Timeout elapsed without the flow being closed externally
-            trySend(DiscoveryEvent.NoPeersFound)
+        awaitClose {
+            timeoutJob.cancel()
             stopDiscovery()
             try {
                 context.unregisterReceiver(receiver)
             } catch (e: IllegalArgumentException) {
-                Log.w(TAG, "Receiver already unregistered on timeout", e)
+                Log.w(TAG, "Receiver already unregistered", e)
             }
-            close()
         }
     }
 

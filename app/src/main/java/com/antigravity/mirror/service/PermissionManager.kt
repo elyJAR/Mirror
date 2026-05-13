@@ -23,8 +23,9 @@ import android.content.pm.PackageManager
 object PermissionManager {
 
     // Base permissions required on all API levels (21+).
-    // These are normal permissions and do not require runtime grants, but are
-    // included so callers have a complete picture of what the app uses.
+    // Only RUNTIME permissions are included here — install-time permissions
+    // (FOREGROUND_SERVICE, INTERNET, WAKE_LOCK, etc.) are always granted at install
+    // and must NOT be passed to requestPermissions() or they will never resolve.
     private val BASE_PERMISSIONS = listOf(
         Manifest.permission.ACCESS_WIFI_STATE,
         Manifest.permission.CHANGE_WIFI_STATE,
@@ -32,6 +33,18 @@ object PermissionManager {
         Manifest.permission.ACCESS_NETWORK_STATE,
         Manifest.permission.INTERNET,
         Manifest.permission.WAKE_LOCK
+    )
+
+    // Install-time permissions — granted automatically, never need to be requested at runtime.
+    private val INSTALL_TIME_PERMISSIONS = setOf(
+        Manifest.permission.ACCESS_WIFI_STATE,
+        Manifest.permission.CHANGE_WIFI_STATE,
+        Manifest.permission.CHANGE_NETWORK_STATE,
+        Manifest.permission.ACCESS_NETWORK_STATE,
+        Manifest.permission.INTERNET,
+        Manifest.permission.WAKE_LOCK,
+        Manifest.permission.FOREGROUND_SERVICE,
+        Manifest.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION
     )
 
     /**
@@ -43,31 +56,24 @@ object PermissionManager {
      * @return Ordered list of permission strings required at that API level.
      */
     fun requiredPermissions(apiLevel: Int): List<String> {
-        val permissions = BASE_PERMISSIONS.toMutableList()
+        val permissions = mutableListOf<String>()
 
         when {
             apiLevel >= 33 -> {
-                // API 33+: NEARBY_WIFI_DEVICES (replaces fine location), FOREGROUND_SERVICE,
-                // and FOREGROUND_SERVICE_MEDIA_PROJECTION (new in API 33).
+                // API 33+: NEARBY_WIFI_DEVICES replaces fine location for Wi-Fi Direct.
+                // POST_NOTIFICATIONS is required to show the foreground service notification.
                 permissions += Manifest.permission.NEARBY_WIFI_DEVICES
-                permissions += Manifest.permission.FOREGROUND_SERVICE
-                permissions += Manifest.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION
+                permissions += Manifest.permission.POST_NOTIFICATIONS
             }
             apiLevel >= 31 -> {
                 // API 31–32: NEARBY_WIFI_DEVICES replaces ACCESS_FINE_LOCATION.
                 permissions += Manifest.permission.NEARBY_WIFI_DEVICES
-                permissions += Manifest.permission.FOREGROUND_SERVICE
-            }
-            apiLevel >= 29 -> {
-                // API 29–30: Fine location still required; foreground service added.
-                permissions += Manifest.permission.ACCESS_FINE_LOCATION
-                permissions += Manifest.permission.FOREGROUND_SERVICE
             }
             apiLevel >= 23 -> {
-                // API 23–28: Fine location required for Wi-Fi Direct peer discovery.
+                // API 23–30: Fine location required for Wi-Fi Direct peer discovery.
                 permissions += Manifest.permission.ACCESS_FINE_LOCATION
             }
-            // API 21–22: base permissions only; all are normal permissions.
+            // API 21–22: no dangerous runtime permissions needed.
         }
 
         return permissions
