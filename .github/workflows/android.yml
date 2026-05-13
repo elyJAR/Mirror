@@ -4,9 +4,10 @@ on:
   push:
     branches: [ "main", "master" ]
     tags:
-      - "v*"          # triggers the release job on any tag like v1.0.0, v1.2.3-beta, etc.
+      - "v*"
   pull_request:
     branches: [ "main", "master" ]
+  workflow_dispatch:
 
 # ---------------------------------------------------------------------------
 # CI job — runs on every push to main and every PR

@@ -2,6 +2,7 @@ package com.antigravity.mirror.stream.media
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.util.Log
 import android.view.Surface
@@ -23,8 +24,19 @@ class VideoEncoder(
     private val width: Int,
     private val height: Int,
     private val bitrateBps: Int,
-    private val frameRate: Int
+    private val frameRate: Int,
+    private val mimeType: String = MediaFormat.MIMETYPE_VIDEO_AVC
 ) {
+    companion object {
+        fun isCodecSupported(mimeType: String): Boolean {
+            return try {
+                MediaCodecList(MediaCodecList.REGULAR_CODECS)
+                    .findEncoderForFormat(MediaFormat.createVideoFormat(mimeType, 1280, 720)) != null
+            } catch (e: Exception) {
+                false
+            }
+        }
+    }
 
     /**
      * Force the encoder to produce an IDR frame as soon as possible.
@@ -83,7 +95,7 @@ class VideoEncoder(
      * Configures the [MediaCodec] encoder and returns its input [Surface].
      */
     fun configure(): Surface {
-        val format = MediaFormat.createVideoFormat(MIME_TYPE, width, height).apply {
+        val format = MediaFormat.createVideoFormat(mimeType, width, height).apply {
             setInteger(
                 MediaFormat.KEY_COLOR_FORMAT,
                 MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
@@ -91,17 +103,14 @@ class VideoEncoder(
             setInteger(MediaFormat.KEY_BIT_RATE, bitrateBps)
             setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
-            setInteger(
-                MediaFormat.KEY_PROFILE,
-                MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline
-            )
-            setInteger(
-                MediaFormat.KEY_LEVEL,
-                MediaCodecInfo.CodecProfileLevel.AVCLevel31
-            )
+            
+            if (mimeType == MediaFormat.MIMETYPE_VIDEO_AVC) {
+                setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
+                setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31)
+            }
         }
 
-        codec = MediaCodec.createEncoderByType(MIME_TYPE)
+        codec = MediaCodec.createEncoderByType(mimeType)
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         isConfigured = true
         return codec.createInputSurface()
@@ -211,25 +220,45 @@ class VideoEncoder(
      * separated by Annex B start codes, and stores them for later prepending to the first IDR.
      */
     private fun parseAndStoreSpsOrPps(rawBytes: ByteArray) {
-        // Split on Annex B start codes and classify each NAL unit
         val nalUnits = splitAnnexB(rawBytes)
         for (nal in nalUnits) {
             if (nal.isEmpty()) continue
-            val nalType = nal[0].toInt() and 0x1F
-            when (nalType) {
-                7 -> spsBuffer = nal  // SPS
-                8 -> ppsBuffer = nal  // PPS
-                else -> Log.d(TAG, "Codec config NAL type $nalType — ignoring")
+            val nalType = if (mimeType == MediaFormat.MIMETYPE_VIDEO_HEVC) {
+                (nal[0].toInt() shr 1) and 0x3F
+            } else {
+                nal[0].toInt() and 0x1F
+            }
+            
+            when {
+                mimeType == MediaFormat.MIMETYPE_VIDEO_HEVC -> {
+                    // HEVC VPS(32), SPS(33), PPS(34)
+                    if (nalType == 32 || nalType == 33 || nalType == 34) {
+                        // For simplicity, we just store the whole config blob 
+                        // and prepend to IDR. H.265 receivers usually handle 
+                        // the combined parameter sets.
+                        spsBuffer = rawBytes 
+                    }
+                }
+                nalType == 7 -> spsBuffer = nal  // SPS
+                nalType == 8 -> ppsBuffer = nal  // PPS
             }
         }
     }
 
     /**
-     * Builds the combined payload for the first IDR frame:
-     * [Annex B start code][SPS][Annex B start code][PPS][Annex B start code][IDR NAL]
+     * Builds the combined payload for the first IDR frame.
      */
     private fun buildCombinedIdrPayload(idrStripped: ByteArray): ByteArray {
         val startCode = byteArrayOf(0x00, 0x00, 0x00, 0x01)
+        
+        if (mimeType == MediaFormat.MIMETYPE_VIDEO_HEVC) {
+            return if (spsBuffer != null) {
+                spsBuffer!! + startCode + idrStripped
+            } else {
+                startCode + idrStripped
+            }
+        }
+
         val sps = spsBuffer
         val pps = ppsBuffer
 

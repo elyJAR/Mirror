@@ -37,6 +37,7 @@ class ProtocolClient(
     private val selector = SelectorManager(Dispatchers.IO)
     
     private val videoQueue = LinkedList<NalUnit>()
+    private val audioQueue = LinkedList<ByteArray>()
     private val queueSignal = Channel<Unit>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     
     private val _events = MutableSharedFlow<ControlMessage>()
@@ -68,6 +69,15 @@ class ProtocolClient(
     }
     
     private var socket: Socket? = null
+    var negotiatedCodec: String = "video/avc"
+        private set
+    
+    private val pinResult = Channel<String>(capacity = 1)
+
+    /** Submit the PIN entered by the user. */
+    fun submitPin(pin: String) {
+        pinResult.trySend(pin)
+    }
     
     private var lastPongTime = System.currentTimeMillis()
 
@@ -92,7 +102,15 @@ class ProtocolClient(
         
         // 1. Handshake: Hello -> HelloAck
         try {
-            val hello = HelloMessage(device = "${Build.MANUFACTURER} ${Build.MODEL}")
+            val codecs = mutableListOf("video/avc")
+            if (com.antigravity.mirror.stream.media.VideoEncoder.isCodecSupported("video/hevc")) {
+                codecs.add("video/hevc")
+            }
+            
+            val hello = HelloMessage(
+                device = "${Build.MANUFACTURER} ${Build.MODEL}",
+                codecs = codecs
+            )
             writeChannel.writeFrame(TAG_CONTROL, json.encodeToString(hello).toByteArray())
             
             val ackFrame = readChannel.readFrame()
@@ -103,7 +121,26 @@ class ProtocolClient(
             val msg = json.decodeFromString<ControlMessage>(String(ackFrame.payload))
             when (msg) {
                 is HelloAckMessage -> {
-                    Log.i(TAG, "Handshake accepted by ${msg.receiver}. Params: ${msg.params}")
+                    this.negotiatedCodec = msg.params.codec
+                    Log.i(TAG, "Handshake accepted by ${msg.receiver}. Negotiated: $negotiatedCodec")
+                    
+                    if (msg.pinRequired) {
+                        Log.i(TAG, "PIN required by peer")
+                        _events.emit(TransportEvent.PairingRequest)
+                        
+                        // Wait for PIN from user
+                        val pin = pinResult.receive()
+                        
+                        writeChannel.writeFrame(TAG_CONTROL, json.encodeToString(VerifyPinMessage(pin = pin)).toByteArray())
+                        
+                        val authFrame = readChannel.readFrame()
+                        val authMsg = json.decodeFromString<ControlMessage>(String(authFrame.payload))
+                        if (authMsg !is AuthResultMessage || !authMsg.success) {
+                            val error = (authMsg as? AuthResultMessage)?.message ?: "Invalid PIN"
+                            throw MirrorError.HandshakeFailed("Authentication failed: $error")
+                        }
+                        Log.i(TAG, "PIN verification successful")
+                    }
                 }
                 is HelloRejectMessage -> {
                     throw MirrorError.HandshakeFailed("Rejected by receiver: ${msg.reason}")
@@ -163,6 +200,18 @@ class ProtocolClient(
                     writeChannel.writeFrame(TAG_VIDEO, nal!!.payload)
                     framesSent++
                     bytesSent += nal!!.payload.size
+                }
+
+                // Drain audio queue
+                while (true) {
+                    val audio: ByteArray?
+                    synchronized(audioQueue) {
+                        audio = audioQueue.pollFirst()
+                    }
+                    if (audio == null) break
+                    
+                    writeChannel.writeFrame(TAG_AUDIO, audio)
+                    bytesSent += audio.size
                 }
             }
         } catch (e: Exception) {
@@ -244,6 +293,19 @@ class ProtocolClient(
                 Log.w(TAG, "Backpressure: Queue full ($MAX_QUEUE_SIZE), dropped frame, requested keyframe.")
             }
             videoQueue.addLast(nal)
+            queueSignal.trySend(Unit)
+        }
+    }
+
+    /**
+     * Enqueues audio data for transmission.
+     */
+    fun sendAudio(data: ByteArray) {
+        synchronized(audioQueue) {
+            if (audioQueue.size >= 100) { // Limit audio queue to ~2s of data
+                audioQueue.pollFirst()
+            }
+            audioQueue.addLast(data)
             queueSignal.trySend(Unit)
         }
     }

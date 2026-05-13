@@ -44,7 +44,9 @@ private class LanTransportSession(
     private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val videoSink = Channel<NalUnit>(capacity = 30)
+    override val audioSink = Channel<ByteArray>(capacity = 60)
     override val stats: Flow<com.antigravity.mirror.stream.api.SessionStats> = client.stats
+    override val negotiatedCodec: String = client.negotiatedCodec
 
     private val _events = MutableSharedFlow<TransportEvent>()
     override val events: Flow<TransportEvent> = _events.asSharedFlow()
@@ -56,9 +58,16 @@ private class LanTransportSession(
                 for (nal in videoSink) {
                     client.sendVideo(nal)
                 }
-            } catch (e: Exception) {
-                // Channel closed or loop cancelled
-            }
+            } catch (e: Exception) {}
+        }
+
+        // Bridge: audioSink -> ProtocolClient.sendAudio
+        sessionScope.launch {
+            try {
+                for (audio in audioSink) {
+                    client.sendAudio(audio)
+                }
+            } catch (e: Exception) {}
         }
 
         // Bridge: ProtocolClient events -> TransportEvent
@@ -67,6 +76,12 @@ private class LanTransportSession(
                 when (msg) {
                     is RequestKeyframeMessage -> {
                         _events.emit(TransportEvent.RequestKeyframe)
+                    }
+                    is TouchEventMessage -> {
+                        _events.emit(TransportEvent.InjectTouch(msg.action, msg.x, msg.y))
+                    }
+                    is KeyEventMessage -> {
+                        _events.emit(TransportEvent.InjectKey(msg.code))
                     }
                     is ByeMessage -> {
                         _events.emit(TransportEvent.PeerDisconnected(msg.reason))
@@ -77,6 +92,10 @@ private class LanTransportSession(
                 }
             }
             .launchIn(sessionScope)
+    }
+
+    override fun submitPin(pin: String) {
+        client.submitPin(pin)
     }
 
     override suspend fun close(reason: String) {

@@ -12,6 +12,7 @@ if (started) {
 let mainWindow: BrowserWindow | null = null;
 const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
+let currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 
 /**
  * Main application window setup.
@@ -53,8 +54,9 @@ function startNetworkServices(window: BrowserWindow) {
     const remoteAddress = socket.remoteAddress;
     console.log('Phone connected:', remoteAddress);
     
-    // Notify renderer of connection
+    // Notify renderer of connection and current PIN
     window.webContents.send('peer-connected', { address: remoteAddress });
+    window.webContents.send('pairing-pin', currentPin);
     
     let buffer = Buffer.alloc(0);
     
@@ -109,7 +111,7 @@ function startNetworkServices(window: BrowserWindow) {
   // Advertise service via mDNS
   bonjour.publish({ 
     name: 'Mirror PC', 
-    type: 'mirror-stream', 
+    type: 'mirror', 
     protocol: 'tcp', 
     port: 8765 
   });
@@ -123,11 +125,27 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
       
       // Automatic handshake response
       if (msg.type === 'hello') {
+        const supportedCodecs = msg.codecs || ['video/avc'];
+        const chosenCodec = supportedCodecs.includes('video/hevc') ? 'video/hevc' : 'video/avc';
+        
         sendControl(socket, {
           type: 'hello-ack',
           receiver: 'Mirror PC',
-          params: { width: 1280, height: 720, fps: 30 }
+          params: { width: 1280, height: 720, fps: 30, codec: chosenCodec },
+          pinRequired: true
         });
+      } else if (msg.type === 'verify-pin') {
+        const isMatch = msg.pin === currentPin;
+        sendControl(socket, {
+          type: 'auth-result',
+          success: isMatch,
+          message: isMatch ? 'Pairing successful' : 'Incorrect PIN. Please try again.'
+        });
+        
+        if (isMatch) {
+          console.log('PIN verified successfully');
+          window.webContents.send('pairing-success');
+        }
       }
     } catch (e) {
       console.error('Failed to parse control message:', e);
@@ -135,6 +153,9 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
   } else if (tag === 0x02) { // Video NAL Unit
     // Forward raw bytes to renderer for WebCodecs
     window.webContents.send('video-frame', payload);
+  } else if (tag === 0x03) { // Audio Data (AAC)
+    // Forward raw bytes to renderer for Audio context/decoder
+    window.webContents.send('audio-frame', payload);
   }
 }
 

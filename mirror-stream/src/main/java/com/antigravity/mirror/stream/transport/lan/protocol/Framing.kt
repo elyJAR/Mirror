@@ -18,6 +18,9 @@ const val TAG_CONTROL: Byte = 0x01
 /** Video NAL units (raw H.264). */
 const val TAG_VIDEO: Byte = 0x02
 
+/** Audio samples (AAC). */
+const val TAG_AUDIO: Byte = 0x03
+
 /** Hard limit to prevent OOM from malformed/hostile frames. */
 const val MAX_PAYLOAD_SIZE = 8 * 1024 * 1024 // 8 MiB
 

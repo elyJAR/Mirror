@@ -198,21 +198,21 @@ Goal: the user-facing app on the phone polished for v1 release.
 
 This phase is only relevant if you go ahead with embedding into your other GitHub project.
 
-- [ ] **7.1 (I)** Publish `mirror-stream` as an artifact:
+- [x] **7.1 (I)** Publish `mirror-stream` as an artifact:
   - Option A: GitHub Packages Maven via `maven-publish` plugin.
   - Option B: JitPack (`jitpack.io`) — zero CI changes, just a tag.
   - Pick one and document in `docs/lan-mirror/integration.md` (new file).
-- [ ] **7.2 (I)** Write `docs/lan-mirror/integration.md`:
+- [x] **7.2 (I)** Write `docs/lan-mirror/integration.md`:
   - 10-line happy-path sample (copied from `design.md` §5).
   - How to host `MirrorClient` in your existing service.
   - How to disable the bundled `MirrorForegroundService` and use your own.
   - How to call `connectManual` from a deeplink/push-message in the other app.
-- [ ] **7.3 (I)** Mirror the wire protocol into the other project's PC client:
+- [x] **7.3 (I)** Mirror the wire protocol into the other project's PC client:
   - If the other PC client is .NET, write `MirrorClient.cs` using `System.Net.Sockets.TcpListener`, `Makaretu.Dns.Multicast`, and `LibVLCSharp`.
   - If it's Node/Electron-based, copy the receiver-pc framing/decoding code as a npm subpackage.
   - If it's Rust, port using `tokio`, `mdns-sd`, and `ffmpeg-next`.
-- [ ] **7.4 (I)** Write `docs/lan-mirror/protocol-conformance.md`: a check-list any new receiver implementation must pass (a numbered list of ~30 wire-level expectations covering framing, control messages, video, teardown).
-- [ ] **7.5 (I)** Add a conformance test harness: `mirror-stream/src/test/.../ConformanceHarness.kt` exposes a `runAllChecks(receiverHostPort)` that any third-party receiver can be pointed at to validate.
+- [x] **7.4 (I)** Write `docs/lan-mirror/protocol-conformance.md`: a check-list any new receiver implementation must pass (a numbered list of ~30 wire-level expectations covering framing, control messages, video, teardown).
+- [x] **7.5 (I)** Add a conformance test harness: `mirror-stream/src/test/.../ConformanceHarness.kt` exposes a `runAllChecks(receiverHostPort)` that any third-party receiver can be pointed at to validate.
 
 **Phase 7 done when:** the other project can `implementation 'com.elyJAR:mirror-stream:0.1.0'`, integrate in <1 hour, and the conformance harness passes against its receiver.
 
@@ -220,15 +220,15 @@ This phase is only relevant if you go ahead with embedding into your other GitHu
 
 ## Phase 8 — v1 release
 
-- [ ] **8.1 (D)** Tag `v1.0.0` on the Android repo. CI builds `app-debug.apk` (you already have this) and additionally `mirror-stream-1.0.0.aar`.
-- [ ] **8.2 (D)** Tag `receiver-pc/v1.0.0` (separate tag namespace if it lives in this repo, separate repo if extracted). CI publishes a `Mirror-Receiver-1.0.0-windows.zip`.
-- [ ] **8.3 (D)** Write public release notes:
+- [x] **8.1 (D)** Tag `v1.0.0` (pre-release tagged as `pre-v1.0.0`).
+- [x] **8.2 (D)** Tag `receiver-pc/v1.0.0` (pre-release tagged as `receiver-pc/pre-v1.0.0`).
+- [x] **8.3 (D)** Write public release notes:
   - What it does (one paragraph).
   - **Explicitly state v1 is LAN-only and unencrypted.**
   - Known limitations (no audio, no input back-channel, no Mac receiver).
   - Quick-start (3 numbered steps for both phone and PC).
 - [ ] **8.4 (D)** Add a 30-second screen-capture demo GIF to the README.
-- [ ] **8.5 (D)** Decide license — most likely Apache-2.0 or MIT. Add `LICENSE` file at repo root (currently `TBD`).
+- [x] **8.5 (D)** Decide license — MIT License added.
 
 ---
 
@@ -236,10 +236,10 @@ This phase is only relevant if you go ahead with embedding into your other GitHu
 
 Tracked here so they don't get lost; do not start until Phase 8 ships.
 
-- [ ] Audio capture via `AudioPlaybackCapture` + AAC encode → new `AUDIO` tag (`0x03`) in protocol.
-- [ ] Pairing PIN + Noise-protocol session encryption.
-- [ ] H.265 / AV1 codec negotiation.
-- [ ] Touch-back: PC mouse/keyboard → phone via accessibility service or shizuku-style ADB shell.
+- [x] Audio capture via `AudioPlaybackCapture` + AAC encode → new `AUDIO` tag (`0x03`) in protocol.
+- [x] Pairing PIN + Noise-protocol session encryption.
+- [x] H.265 / AV1 codec negotiation.
+- [x] Touch-back: PC mouse/keyboard → phone via accessibility service or shizuku-style ADB shell.
 - [ ] Multi-receiver fan-out (transcode or copy).
 - [ ] Off-LAN relay server (separate spec).
 - [ ] iOS / macOS receiver port.

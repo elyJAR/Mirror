@@ -7,8 +7,8 @@ package com.antigravity.mirror.stream.api
  * transitions go through [MirrorClient]'s internal scope.
  *
  * Typical happy-path sequence (LAN transport):
- *   Idle -> Discovering -> ReceiversFound -> Connecting -> AwaitingProjection
- *        -> Streaming -> Idle (after disconnect)
+ *   Idle -> Discovering -> ReceiversFound -> Connecting -> AwaitingPairing
+ *        -> AwaitingProjection -> Streaming -> Idle (after disconnect)
  *
  * Any state can transition to [Error]. Recoverable errors return to [Idle] after a retry,
  * unrecoverable errors stay until [MirrorClient.release] is called or a new session starts.
@@ -26,6 +26,9 @@ sealed interface MirrorState {
 
     /** TCP / Wi-Fi Direct connection in progress; handshake not yet complete. */
     data object Connecting : MirrorState
+
+    /** The peer requires a PIN. UI should show a keypad. */
+    data object AwaitingPairing : MirrorState
 
     /** Handshake done; waiting for the user to grant MediaProjection consent. */
     data object AwaitingProjection : MirrorState

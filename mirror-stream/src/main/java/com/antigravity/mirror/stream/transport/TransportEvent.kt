@@ -28,4 +28,19 @@ sealed interface TransportEvent {
      * A transport-level error occurred (e.g. socket timeout, network loss).
      */
     data class Error(val cause: MirrorError) : TransportEvent
+
+    /**
+     * Request to inject a touch event.
+     */
+    data class InjectTouch(val action: Int, val x: Float, val y: Float) : TransportEvent
+
+    /**
+     * Request to inject a key event.
+     */
+    data class InjectKey(val code: Int) : TransportEvent
+
+    /**
+     * The peer requires a PIN to continue.
+     */
+    data object PairingRequest : TransportEvent
 }

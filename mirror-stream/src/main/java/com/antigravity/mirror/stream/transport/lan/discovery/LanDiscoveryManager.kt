@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import java.net.InetAddress
 
 private const val TAG = "MirrorApp/LanDiscovery"
-private const val SERVICE_TYPE = "_mirror-stream._tcp."
+private const val SERVICE_TYPE = "_mirror._tcp."
 
 /**
  * Manages mDNS (Bonjour) discovery of LAN receivers using Android's NsdManager.

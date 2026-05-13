@@ -1,0 +1,41 @@
+name: Receiver PC CI
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags:
+      - "receiver-pc/v*"
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Windows Receiver
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+          cache: 'npm'
+          cache-dependency-path: receiver-pc/package-lock.json
+
+      - name: Install dependencies
+        working-directory: receiver-pc
+        run: npm install
+
+      - name: Build and Package
+        working-directory: receiver-pc
+        run: npm run make
+
+      - name: Upload Windows Executable
+        uses: actions/upload-artifact@v4
+        with:
+          name: receiver-pc-windows
+          path: receiver-pc/out/make/**/*.exe
+          retention-days: 14

@@ -21,7 +21,8 @@ sealed class ControlMessage {
 data class HelloMessage(
     override val type: String = "hello",
     val version: Int = 1,
-    val device: String
+    val device: String,
+    val codecs: List<String> = listOf("video/avc")
 ) : ControlMessage()
 
 /**
@@ -32,14 +33,16 @@ data class HelloMessage(
 data class HelloAckMessage(
     override val type: String = "hello-ack",
     val receiver: String,
-    val params: SessionParams
+    val params: SessionParams,
+    val pinRequired: Boolean = false
 ) : ControlMessage()
 
 @Serializable
 data class SessionParams(
     val width: Int,
     val height: Int,
-    val fps: Int
+    val fps: Int,
+    val codec: String = "video/avc"
 )
 
 /**
@@ -88,6 +91,49 @@ data class StatsMessage(
     val fps: Double,
     val kbps: Double,
     val latency: Int
+) : ControlMessage()
+
+/**
+ * Sent by the PC to inject a touch event on the phone.
+ */
+@Serializable
+@SerialName("touch")
+data class TouchEventMessage(
+    override val type: String = "touch",
+    val action: Int, // 0=down, 1=up, 2=move
+    val x: Float,    // 0.0 to 1.0 (normalized)
+    val y: Float
+) : ControlMessage()
+
+/**
+ * Sent by the PC to inject a key event on the phone.
+ */
+@Serializable
+@SerialName("key")
+data class KeyEventMessage(
+    override val type: String = "key",
+    val code: Int // Android KeyEvent code
+) : ControlMessage()
+
+/**
+ * Sent by the phone to verify the pairing PIN.
+ */
+@Serializable
+@SerialName("verify-pin")
+data class VerifyPinMessage(
+    override val type: String = "verify-pin",
+    val pin: String
+) : ControlMessage()
+
+/**
+ * Sent by the PC after a verify-pin message.
+ */
+@Serializable
+@SerialName("auth-result")
+data class AuthResultMessage(
+    override val type: String = "auth-result",
+    val success: Boolean,
+    val message: String? = null
 ) : ControlMessage()
 
 /**

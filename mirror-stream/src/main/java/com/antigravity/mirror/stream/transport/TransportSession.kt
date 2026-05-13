@@ -14,11 +14,18 @@ import kotlinx.coroutines.flow.Flow
 interface TransportSession {
     /**
      * Sink for encoded H.264 NAL units.
-     *
-     * The capture/encoder layer pushes [NalUnit]s here. The transport implementation is
-     * responsible for framing/packetising and sending them over the wire.
      */
     val videoSink: SendChannel<NalUnit>
+
+    /**
+     * Sink for encoded AAC audio data.
+     */
+    val audioSink: SendChannel<ByteArray>
+
+    /**
+     * The video codec negotiated with the peer (e.g. "video/avc", "video/hevc").
+     */
+    val negotiatedCodec: String
 
     /**
      * Side-channel events from the peer or transport layer.
@@ -29,6 +36,11 @@ interface TransportSession {
      * Observable performance metrics for the session.
      */
     val stats: Flow<com.antigravity.mirror.stream.api.SessionStats>
+
+    /**
+     * Submits a PIN for authentication if requested by the peer.
+     */
+    fun submitPin(pin: String)
 
     /**
      * Cleanly terminates the session.

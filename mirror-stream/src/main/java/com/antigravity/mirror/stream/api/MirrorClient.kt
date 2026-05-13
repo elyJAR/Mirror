@@ -7,6 +7,7 @@ import android.util.Log
 import com.antigravity.mirror.stream.media.NalUnit
 import com.antigravity.mirror.stream.media.ScreenCaptureEngine
 import com.antigravity.mirror.stream.media.VideoEncoder
+import com.antigravity.mirror.stream.media.AudioEncoder
 import com.antigravity.mirror.stream.selector.TransportSelector
 import com.antigravity.mirror.stream.transport.*
 import com.antigravity.mirror.stream.transport.lan.LanTransport
@@ -48,12 +49,28 @@ class MirrorClient(context: Context) {
     /** Observable performance metrics for the active session. */
     val stats: StateFlow<SessionStats> = _stats.asStateFlow()
 
+    private var inputInjector: ((TransportEvent) -> Unit)? = null
+
+    /**
+     * Provide a callback to inject input events (touch/key) into the system.
+     * Usually implemented by an AccessibilityService or Shizuku shell.
+     */
+    fun setInputInjector(injector: (TransportEvent) -> Unit) {
+        this.inputInjector = injector
+    }
+
+    /** Submit the pairing PIN to the active session. */
+    fun submitPin(pin: String) {
+        activeSession?.submitPin(pin)
+    }
+
     private var discoveryJob: Job? = null
     private var sessionJob: Job? = null
     
     private var activeSession: TransportSession? = null
     private var captureEngine: ScreenCaptureEngine? = null
     private var videoEncoder: VideoEncoder? = null
+    private var audioEncoder: AudioEncoder? = null
     
     private val discoveredTargets = mutableMapOf<Receiver, TransportTarget>()
     private var lastConfig: MirrorConfig? = null
@@ -157,6 +174,15 @@ class MirrorClient(context: Context) {
                                 Log.d(TAG, "Peer requested keyframe")
                                 videoEncoder?.requestKeyframe()
                             }
+                            is TransportEvent.InjectTouch -> {
+                                inputInjector?.invoke(event)
+                            }
+                            is TransportEvent.InjectKey -> {
+                                inputInjector?.invoke(event)
+                            }
+                            TransportEvent.PairingRequest -> {
+                                _state.value = MirrorState.AwaitingPairing
+                            }
                             is TransportEvent.PeerDisconnected -> {
                                 Log.i(TAG, "Peer disconnected: ${event.reason}")
                                 disconnect()
@@ -213,7 +239,8 @@ class MirrorClient(context: Context) {
             width = config.width,
             height = config.height,
             bitrateBps = config.bitrateBps,
-            frameRate = config.fps
+            frameRate = config.fps,
+            mimeType = session.negotiatedCodec
         )
         val capture = ScreenCaptureEngine(projection, encoder)
         
@@ -224,6 +251,13 @@ class MirrorClient(context: Context) {
         
         videoEncoder = encoder
         captureEngine = capture
+        
+        // Start audio capture (Android 10+)
+        audioEncoder = AudioEncoder(projection).apply {
+            start { data, pts ->
+                session.audioSink.trySend(data)
+            }
+        }
         
         try {
             // Default to 160 DPI
@@ -246,8 +280,12 @@ class MirrorClient(context: Context) {
             activeSession = null
             
             captureEngine?.stop()
+            videoEncoder?.stop()
+            audioEncoder?.stop()
+            
             captureEngine = null
             videoEncoder = null
+            audioEncoder = null
             
             _state.value = MirrorState.Idle
         }
