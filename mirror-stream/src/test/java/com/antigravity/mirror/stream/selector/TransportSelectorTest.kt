@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
-import com.antigravity.mirror.stream.api.Transport
+import com.antigravity.mirror.stream.api.TransportPreference
 import com.antigravity.mirror.stream.transport.TransportId
 import io.kotest.matchers.collections.shouldContainExactly
 import io.mockk.mockk
@@ -35,14 +35,14 @@ class TransportSelectorTest {
     @Test
     fun `selectTransports returns only LAN when preference is LAN`() = runTest {
         val selector = TransportSelector(context, testDataStore)
-        val result = selector.selectTransports(Transport.LAN)
+        val result = selector.selectTransports(TransportPreference.LAN)
         result.shouldContainExactly(TransportId.LAN)
     }
 
     @Test
     fun `selectTransports returns only MIRACAST when preference is MIRACAST`() = runTest {
         val selector = TransportSelector(context, testDataStore)
-        val result = selector.selectTransports(Transport.MIRACAST)
+        val result = selector.selectTransports(TransportPreference.MIRACAST)
         result.shouldContainExactly(TransportId.MIRACAST)
     }
 
@@ -53,7 +53,7 @@ class TransportSelectorTest {
             manufacturer = "Google", 
             sdkInt = 33
         )
-        val result = selector.selectTransports(Transport.AUTO)
+        val result = selector.selectTransports(TransportPreference.AUTO)
         result.shouldContainExactly(TransportId.MIRACAST, TransportId.LAN)
     }
 
@@ -64,7 +64,7 @@ class TransportSelectorTest {
             manufacturer = "Samsung", 
             sdkInt = 34
         )
-        val result = selector.selectTransports(Transport.AUTO)
+        val result = selector.selectTransports(TransportPreference.AUTO)
         result.shouldContainExactly(TransportId.LAN)
     }
 
@@ -77,13 +77,13 @@ class TransportSelectorTest {
         )
         
         // Initially allowed via heuristic
-        selector.selectTransports(Transport.AUTO).shouldContainExactly(TransportId.MIRACAST, TransportId.LAN)
+        selector.selectTransports(TransportPreference.AUTO).shouldContainExactly(TransportId.MIRACAST, TransportId.LAN)
 
         // Record failure
         selector.recordOutcome(TransportId.MIRACAST, false)
 
         // Now should be DENIED
-        selector.selectTransports(Transport.AUTO).shouldContainExactly(TransportId.LAN)
+        selector.selectTransports(TransportPreference.AUTO).shouldContainExactly(TransportId.LAN)
     }
     
     @Test
@@ -96,12 +96,12 @@ class TransportSelectorTest {
         )
         
         // Initially denied
-        selector.selectTransports(Transport.AUTO).shouldContainExactly(TransportId.LAN)
+        selector.selectTransports(TransportPreference.AUTO).shouldContainExactly(TransportId.LAN)
 
         // Record success (e.g. if forced or somehow worked)
         selector.recordOutcome(TransportId.MIRACAST, true)
 
         // Now should be ALLOWED
-        selector.selectTransports(Transport.AUTO).shouldContainExactly(TransportId.MIRACAST, TransportId.LAN)
+        selector.selectTransports(TransportPreference.AUTO).shouldContainExactly(TransportId.MIRACAST, TransportId.LAN)
     }
 }

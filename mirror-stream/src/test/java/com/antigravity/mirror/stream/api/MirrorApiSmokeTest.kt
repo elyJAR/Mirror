@@ -20,7 +20,7 @@ class MirrorApiSmokeTest : StringSpec({
         cfg.fps shouldBe 30
         cfg.bitrateBps shouldBe 4_000_000
         cfg.codec shouldBe Codec.H264_BASELINE
-        cfg.transport shouldBe Transport.AUTO
+        cfg.transport shouldBe TransportPreference.AUTO
     }
 
     "MirrorState.Idle is a singleton" {
@@ -30,7 +30,7 @@ class MirrorApiSmokeTest : StringSpec({
     }
 
     "MirrorState.ReceiversFound carries the receiver list" {
-        val r = Receiver("My PC", "192.168.1.50", 8765, Transport.LAN)
+        val r = Receiver("My PC", "192.168.1.50", 8765, TransportId.LAN)
         val state: MirrorState = MirrorState.ReceiversFound(listOf(r))
         state.shouldBeInstanceOf<MirrorState.ReceiversFound>()
         (state as MirrorState.ReceiversFound).receivers shouldBe listOf(r)
@@ -49,14 +49,14 @@ class MirrorApiSmokeTest : StringSpec({
     }
 
     "Receiver equality is structural" {
-        val a = Receiver("PC", "10.0.0.1", 8765, Transport.LAN)
-        val b = Receiver("PC", "10.0.0.1", 8765, Transport.LAN)
-        val c = Receiver("PC", "10.0.0.1", 8765, Transport.MIRACAST)
+        val a = Receiver("PC", "10.0.0.1", 8765, TransportId.LAN)
+        val b = Receiver("PC", "10.0.0.1", 8765, TransportId.LAN)
+        val c = Receiver("PC", "10.0.0.1", 8765, TransportId.MIRACAST)
         (a == b) shouldBe true
         (a == c) shouldBe false
     }
 
-    "Transport enum covers all three modes" {
-        Transport.values().toSet() shouldBe setOf(Transport.AUTO, Transport.LAN, Transport.MIRACAST)
+    "TransportPreference enum covers all three modes" {
+        TransportPreference.values().toSet() shouldBe setOf(TransportPreference.AUTO, TransportPreference.LAN, TransportPreference.MIRACAST)
     }
 })

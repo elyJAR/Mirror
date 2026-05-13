@@ -3,6 +3,7 @@ package com.antigravity.mirror.stream.transport.lan.protocol
 import com.antigravity.mirror.stream.media.NalUnit
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import java.net.ServerSocket
