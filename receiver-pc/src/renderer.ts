@@ -139,6 +139,7 @@ window.electronAPI.onPeerDisconnected(() => {
   peerEl.textContent = 'No Peer';
   statusEl.textContent = 'Waiting for phone...';
   isConfigured = false;
+  pairingEl.style.display = 'none';
 });
 
 window.electronAPI.onControlMessage((msg) => {
@@ -177,8 +178,13 @@ window.electronAPI.onVideoFrame((payload: Uint8Array) => {
   annexB.set([0, 0, 0, 1], 0);
   annexB.set(payload, 4);
 
+  // Keyframe detection:
+  // AVC: nalType 5 (IDR)
+  // HEVC: hevcType 16-21 (IDR, CRA)
+  const isKey = isHEVC ? (hevcType >= 16 && hevcType <= 21) : (nalType === 5);
+
   const chunk = new EncodedVideoChunk({
-    type: (nalType === 5) ? 'key' : 'delta',
+    type: isKey ? 'key' : 'delta',
     timestamp: performance.now() * 1000, // Microseconds
     data: annexB,
   });
