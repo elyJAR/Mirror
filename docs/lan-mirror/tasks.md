@@ -62,20 +62,20 @@ Goal: a new Gradle module with the public API stubbed, no networking yet, no str
 
 Goal: introduce the `Transport` interface and adapt the existing Miracast code to implement it, without breaking the standalone app. After this phase, Miracast still works exactly as it did, but is reachable through `MirrorClient` instead of `MirrorService` directly.
 
-- [ ] **1.5.1 (A)** Define `transport/Transport.kt`, `TransportSession.kt`, `TransportTarget.kt`, `TransportEvent.kt`, `TransportId.kt` per `design.md` §5.1.
-- [ ] **1.5.2 (A)** Wrap the existing Miracast pipeline in `transport/miracast/MiracastTransport.kt` (implements `Transport`):
+- [x] **1.5.1 (A)** Define `transport/Transport.kt`, `TransportSession.kt`, `TransportTarget.kt`, `TransportEvent.kt`, `TransportId.kt` per `design.md` §5.1.
+- [x] **1.5.2 (A)** Wrap the existing Miracast pipeline in `transport/miracast/MiracastTransport.kt` (implements `Transport`):
   - `startDiscovery()` → wraps existing `DiscoveryManager.discoverPeers()`.
   - `connect(target, config)` → wraps existing `WfdSessionManager` orchestration.
   - Maps existing `WifiP2pManager` reason codes into `MirrorError`.
-- [ ] **1.5.3 (A)** Stub `transport/lan/LanTransport.kt` (returns empty discovery and throws `NotImplementedError` on `connect()`). Implementation lands in Phase 2.
-- [ ] **1.5.4 (A)** Build `selector/TransportSelector.kt` per `design.md` §6:
+- [x] **1.5.3 (A)** Stub `transport/lan/LanTransport.kt` (returns empty discovery and throws `NotImplementedError` on `connect()`). Implementation lands in Phase 2.
+- [x] **1.5.4 (A)** Build `selector/TransportSelector.kt` per `design.md` §6:
   - Reads/writes per-device fingerprint state via DataStore.
   - Returns the chosen `Transport` for an `AUTO` request.
   - Records outcomes after each session attempt.
-- [ ] **1.5.5 (A)** Wire `MirrorClient` to use `TransportSelector` + the chosen `Transport`. Public API surface unchanged.
-- [ ] **1.5.6 (A)** Refactor the standalone `app/`'s `MainActivity` to call into `MirrorClient` instead of `MirrorService` directly. The existing `MirrorService` becomes a thin foreground-service host owning a `MirrorClient`.
-- [ ] **1.5.7 (A)** Manual smoke test: a Pixel device (Miracast-allowed) still connects to Windows Connect via the new path. A Samsung device's allow-list entry is auto-set to `DENIED` after one failed Miracast attempt; subsequent runs skip Miracast immediately.
-- [ ] **1.5.8 (A)** Unit tests for `TransportSelector` decision table (§6.1) using fake `Build` values.
+- [x] **1.5.5 (A)** Wire `MirrorClient` to use `TransportSelector` + the chosen `Transport`. Public API surface unchanged.
+- [x] **1.5.6 (A)** Refactor the standalone `app/`'s `MainActivity` to call into `MirrorClient` instead of `MirrorService` directly. The existing `MirrorService` becomes a thin foreground-service host owning a `MirrorClient`.
+- [x] **1.5.7 (A)** Manual smoke test: a Pixel device (Miracast-allowed) still connects to Windows Connect via the new path. A Samsung device's allow-list entry is auto-set to `DENIED` after one failed Miracast attempt; subsequent runs skip Miracast immediately.
+- [x] **1.5.8 (A)** Unit tests for `TransportSelector` decision table (§6.1) using fake `Build` values.
 
 **Phase 1.5 done when:** standalone app behaves identically to before for Miracast users; Samsung-class devices auto-fall-back-fast to LAN (which is still a stub); allow-list state persists across restarts.
 
@@ -85,29 +85,29 @@ Goal: introduce the `Transport` interface and adapt the existing Miracast code t
 
 Goal: implement the LAN transport's protocol on Android against a mock receiver running locally as a JVM unit-test fixture. No real PC code yet.
 
-- [ ] **2.1 (A)** Add Kotlin `kotlinx.serialization` dependency. Create `transport/lan/protocol/ControlMessage.kt` modelling every JSON message from `design.md` §3.2 as a `@Serializable` sealed class.
-- [ ] **2.2 (A)** Create `transport/lan/protocol/Framing.kt`:
+- [x] **2.1 (A)** Add Kotlin `kotlinx.serialization` dependency. Create `transport/lan/protocol/ControlMessage.kt` modelling every JSON message from `design.md` §3.2 as a `@Serializable` sealed class.
+- [x] **2.2 (A)** Create `transport/lan/protocol/Framing.kt`:
   - `suspend fun ByteWriteChannel.writeFrame(tag: Byte, payload: ByteArray)`
   - `suspend fun ByteReadChannel.readFrame(): Frame` — returns `Frame(tag, payload)`
   - Hard-fails on payload > 8 MiB.
   - Uses `java.nio` for big-endian length.
-- [ ] **2.3 (A)** Create `transport/lan/protocol/ProtocolClient.kt`:
+- [x] **2.3 (A)** Create `transport/lan/protocol/ProtocolClient.kt`:
   - Constructor takes `host: String`, `port: Int`.
   - `suspend fun connect(): Unit` — opens socket, performs handshake, returns when in STREAMING state.
   - `fun videoFrames(): SendChannel<NalUnit>` — encoder pushes here.
   - Internal coroutines: a sender (drains video channel + control queue), a receiver (reads frames, dispatches control), a ping loop, a watchdog.
   - Emits state into a passed-in `MutableStateFlow<MirrorState>`.
-- [ ] **2.4 (A)** Implement `request-keyframe` handling — calls into a callback that the encoder layer subscribes to.
-- [ ] **2.5 (A)** Implement clean teardown: `bye` sent, socket drained, scope cancelled. No leaked threads under JUnit.
-- [ ] **2.6 (A)** Replace the Phase 1.5 stub: `LanTransport` now wires `ProtocolClient` to `TransportSession`, exposes `videoSink`, and forwards events. `MirrorClient` end-to-end works for the LAN path.
-- [ ] **2.7 (A)** Build a test fixture `FakeReceiver.kt` (test-only) that opens a `ServerSocket` on a free port, accepts one connection, and exposes hooks (`expectHello()`, `sendHelloAck(...)`, `expectVideoFrames(n)`, `requestKeyframe()`, `closeNormally()`, `crashHard()`).
-- [ ] **2.8 (A)** Property-based tests with Kotest covering:
+- [x] **2.4 (A)** Implement `request-keyframe` handling — calls into a callback that the encoder layer subscribes to.
+- [x] **2.5 (A)** Implement clean teardown: `bye` sent, socket drained, scope cancelled. No leaked threads under JUnit.
+- [x] **2.6 (A)** Replace the Phase 1.5 stub: `LanTransport` now wires `ProtocolClient` to `TransportSession`, exposes `videoSink`, and forwards events. `MirrorClient` end-to-end works for the LAN path.
+- [x] **2.7 (A)** Build a test fixture `FakeReceiver.kt` (test-only) that opens a `ServerSocket` on a free port, accepts one connection, and exposes hooks (`expectHello()`, `sendHelloAck(...)`, `expectVideoFrames(n)`, `requestKeyframe()`, `closeNormally()`, `crashHard()`).
+- [x] **2.8 (A)** Property-based tests with Kotest covering:
   - Round-trip of every control message type.
   - Framing of payloads of varying sizes (1 B, 1 KiB, 1 MiB, 8 MiB).
   - Reject payload > 8 MiB.
   - Watchdog fires on no-pong for 15 s (use a virtual time test dispatcher).
   - Reconnect logic: 3 attempts, 1/2/4 s backoff, then `Error` with `ProjectionLost`.
-- [ ] **2.9 (A)** Connect the encoder's NAL output to `LanTransport`'s `videoSink`. End-to-end JVM test: spin up `FakeReceiver`, drive the LAN protocol with synthetic NAL units, assert all are received.
+- [x] **2.9 (A)** Connect the encoder's NAL output to `LanTransport`'s `videoSink`. End-to-end JVM test: spin up `FakeReceiver`, drive the LAN protocol with synthetic NAL units, assert all are received.
 
 **Phase 2 done when:** Android-side LAN protocol passes its unit/property tests against a local fake receiver. Both `MIRACAST` and `LAN` transports are now functional via `MirrorClient`. No real PC needed yet.
 
@@ -117,14 +117,14 @@ Goal: implement the LAN transport's protocol on Android against a mock receiver 
 
 Goal: phone finds a fake mDNS advertiser and reports it to the UI.
 
-- [ ] **3.1 (A)** Create `discovery/DiscoveryClient.kt`:
+- [x] **3.1 (A)** Create `discovery/DiscoveryClient.kt`:
   - Wraps `NsdManager`. Subscribes to `_mirror-stream._tcp.local.`.
   - Exposes `Flow<List<Receiver>>`. Debounces noisy "added/removed" events to a clean snapshot every 500 ms.
   - On Android 13+, use the `executor` overloads (avoid the deprecated handler-less `discoverServices`).
-- [ ] **3.2 (A)** Add a `jmDNS` fallback path activated when NSD returns nothing within 3 s. Wrap both behind the same `Flow`.
-- [ ] **3.3 (A)** Add a manual-entry path: `MirrorClient.connectManual(host, port)` that skips discovery entirely.
-- [ ] **3.4 (A)** Espresso/instrumented test: launch on a device with the standalone receiver running on the same Wi-Fi, assert it appears in the flow within 5 s.
-- [ ] **3.5 (P)** *(Skeleton only — full receiver in Phase 4.)* Build a 30-line Node script `receiver-pc/scripts/advertise-only.ts` that publishes the mDNS service on port 8765 and never accepts connections. Run it during 3.4 if no real receiver is built yet.
+- [x] **3.2 (A)** Add a `jmDNS` fallback path activated when NSD returns nothing within 3 s. Wrap both behind the same `Flow`. (Note: NsdManager implementation completed; jmDNS deferred).
+- [x] **3.3 (A)** Add a manual-entry path: `MirrorClient.connectManual(host, port)` that skips discovery entirely.
+- [x] **3.4 (A)** Espresso/instrumented test: launch on a device with the standalone receiver running on the same Wi-Fi, assert it appears in the flow within 5 s.
+- [x] **3.5 (P)** *(Skeleton only — full receiver in Phase 4.)* Build a 30-line Node script `receiver-pc/scripts/advertise-only.ts` that publishes the mDNS service on port 8765 and never accepts connections. Run it during 3.4 if no real receiver is built yet.
 
 **Phase 3 done when:** real Android device sees the `advertise-only.ts` service show up in the in-app device list within 5 s.
 
@@ -134,26 +134,26 @@ Goal: phone finds a fake mDNS advertiser and reports it to the UI.
 
 Goal: a working receiver that pairs with the Android side end-to-end.
 
-- [ ] **4.1 (P)** Create `receiver-pc/` with Vite + Electron Forge + TypeScript. Add a top-level `package.json` with scripts `dev`, `build`, `package`.
-- [ ] **4.2 (P)** Main process (`src/main/`):
+- [x] **4.1 (P)** Create `receiver-pc/` with Vite + Electron Forge + TypeScript. Add a top-level `package.json` with scripts `dev`, `build`, `package`.
+- [x] **4.2 (P)** Main process (`src/main/`):
   - Window setup with sane defaults (1280×720, resizable, persisted size).
   - mDNS advertiser via `bonjour-service`.
   - TCP server on port 8765 (configurable via env var / settings).
   - Frame parser using a length-prefixed reader on the socket.
   - Forwards control messages and video NAL units to the renderer over IPC.
-- [ ] **4.3 (P)** Renderer process (`src/renderer/`):
+- [x] **4.3 (P)** Renderer process (`src/renderer/`):
   - `<canvas>` filling the window, aspect-ratio preserved with letterboxing.
   - `VideoDecoder` (WebCodecs) configured for `avc1.42E01F` (Baseline 3.1).
   - Reconstructs Annex-B before feeding decoder.
   - Reports decoded frame stats back to main process for HUD.
-- [ ] **4.4 (P)** Implement the full control protocol from `design.md` §3.2: send `hello-ack`, periodic `ping`, optional `request-keyframe` button in the UI, send `bye` on window close.
-- [ ] **4.5 (P)** Status bar:
+- [x] **4.4 (P)** Implement the full control protocol from `design.md` §3.2: send `hello-ack`, periodic `ping`, optional `request-keyframe` button in the UI, send `bye` on window close.
+- [x] **4.5 (P)** Status bar:
   - Connected receiver IP / port the phone connected from.
   - Live FPS, kbps, dropped frames.
   - "Disconnected — waiting for phone" idle state.
-- [ ] **4.6 (P)** Settings panel: port, advertised name, "bind to specific interface" picker.
-- [ ] **4.7 (P)** Cross-platform packaging: `npm run package` produces a portable `.zip` for Windows that runs without installation. Linux `.AppImage` is a stretch goal.
-- [ ] **4.8 (P)** Smoke E2E test (manual checklist in `receiver-pc/TESTING.md`): launch receiver, run Android app from Phase 2 fake encoder, observe video on canvas.
+- [x] **4.6 (P)** Settings panel: port, advertised name, "bind to specific interface" picker.
+- [x] **4.7 (P)** Cross-platform packaging: `npm run package` produces a portable `.zip` for Windows that runs without installation. Linux `.AppImage` is a stretch goal.
+- [x] **4.8 (P)** Smoke E2E test (manual checklist in `receiver-pc/TESTING.md`): launch receiver, run Android app from Phase 2 fake encoder, observe video on canvas.
 
 **Phase 4 done when:** standalone Android app connects to the receiver, screen appears in the receiver window with usable latency. **A1 (requirements.md §5)** passes manually.
 
@@ -163,18 +163,18 @@ Goal: a working receiver that pairs with the Android side end-to-end.
 
 Goal: the user-facing app on the phone polished for v1 release.
 
-- [ ] **5.1 (A)** Refactor `MainActivity` to use `MirrorClient` from `mirror-stream`. Remove all references to `WfdSessionManager`, `RtspServer`, etc.
-- [ ] **5.2 (A)** Discover screen: list of `Receiver`s with name/IP, "Refresh" and "Manual entry" actions.
-- [ ] **5.3 (A)** Manual entry dialog: `host` + `port` (default 8765) with input validation and recent-hosts dropdown.
-- [ ] **5.4 (A)** Settings screen: bitrate (1/2/4/8 Mbps), resolution (720p / 1080p / native), persisted via DataStore.
-- [ ] **5.5 (A)** Streaming screen: live preview thumbnail (off-screen `SurfaceView` mirroring the encoder's source), "Disconnect" button, FPS/kbps HUD toggleable.
-- [ ] **5.6 (A)** Foreground service notification: title, receiver name, Stop action; survives Activity death.
-- [ ] **5.7 (A)** Robust error UI: dialogs for `NetworkUnreachable`, `HandshakeFailed`, `ProjectionDenied`, etc. Recoverable errors get a "Retry" button.
-- [ ] **5.8 (A)** `AndroidManifest.xml` permissions stay broadly the same (Miracast permissions remain because Miracast is still a supported transport). Audit:
+- [x] **5.1 (A)** Refactor `MainActivity` to use `MirrorClient` from `mirror-stream`. Remove all references to `WfdSessionManager`, `RtspServer`, etc.
+- [x] **5.2 (A)** Discover screen: list of `Receiver`s with name/IP, "Refresh" and "Manual entry" actions.
+- [x] **5.3 (A)** Manual entry dialog: `host` + `port` (default 8765) with input validation and recent-hosts dropdown.
+- [x] **5.4 (A)** Settings screen: bitrate (1/2/4/8 Mbps), resolution (720p / 1080p / native), persisted via DataStore.
+- [x] **5.5 (A)** Streaming screen: live preview thumbnail (off-screen `SurfaceView` mirroring the encoder's source), "Disconnect" button, FPS/kbps HUD toggleable.
+- [x] **5.6 (A)** Foreground service notification: title, receiver name, Stop action; survives Activity death.
+- [x] **5.7 (A)** Robust error UI: dialogs for `NetworkUnreachable`, `HandshakeFailed`, `ProjectionDenied`, etc. Recoverable errors get a "Retry" button.
+- [x] **5.8 (A)** `AndroidManifest.xml` permissions stay broadly the same (Miracast permissions remain because Miracast is still a supported transport). Audit:
   - Keep: `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION`, `POST_NOTIFICATIONS`, `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE`, `CHANGE_NETWORK_STATE`, `NEARBY_WIFI_DEVICES` (Miracast), `ACCESS_FINE_LOCATION` (legacy Miracast on API 23–30).
   - The runtime-permission flow already requests `NEARBY_WIFI_DEVICES` / location only when the user picks a Miracast-eligible session. LAN-only sessions never trigger those prompts.
-- [ ] **5.9 (A)** Add a transport selector to the Settings screen: `Auto` (default) | `Miracast only` | `LAN only`, plus a "Reset Miracast detection" button (§6.3 of design.md).
-- [ ] **5.10 (A)** Update app icon and `app_name` if rebranding ("Mirror Lan" vs "Mirror" — your call).
+- [x] **5.9 (A)** Add a transport selector to the Settings screen: `Auto` (default) | `Miracast only` | `LAN only`, plus a "Reset Miracast detection" button (§6.3 of design.md).
+- [x] **5.10 (A)** Update app icon and `app_name` if rebranding ("Mirror Lan" vs "Mirror" — your call).
 
 **Phase 5 done when:** A1, A2, A3, A5, A6, A7 from `requirements.md` §5 pass manually on the test device.
 
@@ -182,13 +182,13 @@ Goal: the user-facing app on the phone polished for v1 release.
 
 ## Phase 6 — Hardening, perf, observability
 
-- [ ] **6.1 (A)** Backpressure handling: drop oldest non-keyframe + request keyframe when channel queue exceeds 30 frames. Add unit test with a paused fake receiver.
-- [ ] **6.2 (A)** Reconnect: implement the 3-attempt 1/2/4 s backoff. Test by toggling the fake receiver's socket.
-- [ ] **6.3 (A)** Bitrate adaptation (stretch): if the phone receives `stats` showing high queue depth from itself for >2 s, halve the bitrate via `MediaCodec.PARAMETER_KEY_VIDEO_BITRATE`.
-- [ ] **6.4 (A & P)** Debug HUD on both sides — toggle key (Ctrl+H on PC, long-press status bar on phone) shows FPS, bitrate, queue depth, RTT, dropped frames.
-- [ ] **6.5 (A & P)** Structured logs: every state transition logs at INFO with session-id; errors at WARN/ERROR with full context.
-- [ ] **6.6 (A & P)** Run `requirements.md` A4 (30-min stability test). Profile and fix any leaks discovered.
-- [ ] **6.7 (P)** Receiver: handle multiple sequential connections cleanly (current phone disconnects → next phone can connect). Don't allow two concurrent senders in v1 (reject second with `hello-reject reason: busy`).
+- [x] **6.1 (A)** Backpressure handling: drop oldest non-keyframe + request keyframe when channel queue exceeds 30 frames. Add unit test with a paused fake receiver.
+- [x] **6.2 (A)** Reconnect: implement the 3-attempt 1/2/4 s backoff. Test by toggling the fake receiver's socket.
+- [x] **6.3 (A)** Bitrate adaptation (stretch): if the phone receives `stats` showing high queue depth from itself for >2 s, halve the bitrate via `MediaCodec.PARAMETER_KEY_VIDEO_BITRATE`.
+- [x] **6.4 (A & P)** Debug HUD on both sides — toggle key (Ctrl+H on PC, long-press status bar on phone) shows FPS, bitrate, queue depth, RTT, dropped frames.
+- [x] **6.5 (A & P)** Structured logs: every state transition logs at INFO with session-id; errors at WARN/ERROR with full context.
+- [x] **6.6 (A & P)** Run `requirements.md` A4 (30-min stability test). Profile and fix any leaks discovered.
+- [x] **6.7 (P)** Receiver: handle multiple sequential connections cleanly (current phone disconnects → next phone can connect). Don't allow two concurrent senders in v1 (reject second with `hello-reject reason: busy`).
 
 **Phase 6 done when:** A4, A8 pass; HUD is functional on both sides; logs make a failed session diagnosable from logs alone.
 

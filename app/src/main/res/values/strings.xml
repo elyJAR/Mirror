@@ -2,9 +2,17 @@
 <resources>
     <string name="app_name">Screen Mirror</string>
     <string name="notification_title">Screen Mirror Active</string>
-    <string name="notification_text">Streaming your screen…</string>
+    <string name="notification_text">Service is running in background</string>
+    <string name="notification_text_streaming">Streaming your screen…</string>
     <string name="btn_discover">Discover Devices</string>
-    <string name="btn_disconnect">Disconnect</string>
+    <string name="btn_disconnect">Stop Mirroring</string>
+    <string name="btn_manual_connect">Connect Manually</string>
+    <string name="action_settings">Settings</string>
+    <string name="dialog_manual_connect_title">Manual Connection</string>
+    <string name="dialog_manual_connect_host_hint">PC IP Address (e.g. 192.168.1.5)</string>
+    <string name="dialog_manual_connect_port_hint">Port (default 8765)</string>
+    <string name="btn_connect">Connect</string>
+    <string name="btn_cancel">Cancel</string>
     <string name="btn_retry">Retry</string>
     <string name="label_discovering">Searching for devices…</string>
     <string name="label_connecting">Connecting…</string>

@@ -80,9 +80,7 @@ private enum class WfdState {
  * Requirements: 1.1, 4.1, 4.2, 4.5
  */
 class WfdSessionManager(
-    private val rtspServer: RtspServer,
-    private val captureEngine: ScreenCaptureEngine,
-    private val rtpSender: RtpSender
+    private val rtspServer: RtspServer
 ) {
 
     /** Current state machine state. Accessed only from the flow's coroutine. */
@@ -107,7 +105,7 @@ class WfdSessionManager(
      *
      * Requirements: 1.1, 4.1, 4.2, 4.5
      */
-    fun startSession(projection: MediaProjection): Flow<SessionEvent> = callbackFlow<SessionEvent> {
+    fun startSession(): Flow<SessionEvent> = callbackFlow<SessionEvent> {
         activeScope = this
         state = WfdState.AWAITING_M1_OPTIONS
         Log.i(TAG, "WFD session starting, state=$state")
@@ -171,7 +169,7 @@ class WfdSessionManager(
 
                     WfdState.AWAITING_M7_PLAY -> {
                         if (message.method.equals("PLAY", ignoreCase = true)) {
-                            handleM7Play(message.cseq, projection)
+                            handleM7Play(message.cseq)
                         } else {
                             handleUnexpectedMessage(message.method, state)
                         }
@@ -421,7 +419,7 @@ class WfdSessionManager(
     // → Emit NegotiationComplete, start capture + RTP, emit StreamingStarted
     // -------------------------------------------------------------------------
 
-    private fun ProducerScope<SessionEvent>.handleM7Play(cseq: Int, projection: MediaProjection) {
+    private fun ProducerScope<SessionEvent>.handleM7Play(cseq: Int) {
         Log.d(TAG, "M7: Handling PLAY from sink (CSeq=$cseq)")
 
         val response = RtspResponse(
@@ -438,15 +436,10 @@ class WfdSessionManager(
 
         // Emit NegotiationComplete — M1–M7 handshake is done
         trySend(SessionEvent.NegotiationComplete)
-        Log.i(TAG, "M7 handled — negotiation complete, starting capture engine")
+        Log.i(TAG, "M7 handled — negotiation complete")
 
-        // Start screen capture and RTP streaming
-        // Use 1280x720 @ 160 dpi as the default negotiated resolution
-        captureEngine.start(width = 1280, height = 720, dpi = 160)
-
-        // Emit StreamingStarted — RTP stream is now active
-        trySend(SessionEvent.StreamingStarted)
-        Log.i(TAG, "Streaming started")
+        // Emit PlayRequested — Sink is ready for the stream
+        trySend(SessionEvent.PlayRequested)
     }
 
     // -------------------------------------------------------------------------
@@ -469,11 +462,6 @@ class WfdSessionManager(
 
         state = WfdState.TERMINATED
         trySend(SessionEvent.SessionEnded)
-
-        // Release resources
-        runCatching { captureEngine.stop() }
-        runCatching { rtpSender.close() }
-        runCatching { rtspServer.stop() }
 
         close() // Close the callbackFlow channel
     }
@@ -524,11 +512,6 @@ class WfdSessionManager(
             rtspServer.sendResponse(teardownResponse)
         }
 
-        // Release all resources
-        runCatching { captureEngine.stop() }
-        runCatching { rtpSender.close() }
-        runCatching { rtspServer.stop() }
-
         // Emit SessionEnded if the flow is still active
         activeScope?.let { scope ->
             scope.trySend(SessionEvent.SessionEnded)
@@ -548,8 +531,11 @@ sealed class SessionEvent {
     /** The M1–M7 RTSP handshake completed successfully. */
     object NegotiationComplete : SessionEvent()
 
-    /** The RTP stream is actively transmitting encoded video. */
-    object StreamingStarted : SessionEvent()
+    /** 
+     * Sink sent PLAY (M7). 
+     * The transport implementation should now start feeding the videoSink.
+     */
+    object PlayRequested : SessionEvent()
 
     /** An error occurred during streaming. */
     data class StreamingError(val cause: Throwable) : SessionEvent()

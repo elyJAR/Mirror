@@ -2,70 +2,191 @@ package com.antigravity.mirror.stream.api
 
 import android.content.Context
 import android.content.Intent
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import android.media.projection.MediaProjectionManager
+import android.util.Log
+import com.antigravity.mirror.stream.media.NalUnit
+import com.antigravity.mirror.stream.media.ScreenCaptureEngine
+import com.antigravity.mirror.stream.media.VideoEncoder
+import com.antigravity.mirror.stream.selector.TransportSelector
+import com.antigravity.mirror.stream.transport.*
+import com.antigravity.mirror.stream.transport.lan.LanTransport
+import com.antigravity.mirror.stream.transport.miracast.MiracastTransport
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.*
+import kotlin.math.pow
+
+private const val TAG = "MirrorApp/MirrorClient"
 
 /**
  * Public entry point for screen mirroring.
  *
- * Designed for ≤ 10 lines of consumer code on the happy path:
- * ```
- * val client = MirrorClient(context)
- * client.startDiscovery()
- * // observe client.state — when ReceiversFound, call:
- * client.connect(receivers.first())
- * // when AwaitingProjection, launch the system consent intent and pass the result back:
- * client.onProjectionGranted(resultCode, data)
- * // it transitions to Streaming. To stop:
- * client.disconnect()
- * ```
+ * Designed for ≤ 10 lines of consumer code on the happy path.
  *
- * **Status: Phase 1 stub.** All methods are no-ops or throw [NotImplementedError]; the
- * `state` flow is wired up so consumers can already integrate against the surface.
- * Real behaviour is implemented in Phases 1.5 (transport selector wrapping the existing
- * Miracast pipeline) and 2 (LAN transport).
- *
- * Construction is `Context`-typed so the future implementation can:
- *  - access `MediaProjectionManager`,
- *  - read `Build.MANUFACTURER` / `Build.VERSION.SDK_INT` for transport selection,
- *  - persist the per-device Miracast allow-list via DataStore,
- *  - host a foreground service when the consumer opts in.
- *
- * The constructor stores [Context.getApplicationContext] only; it does not retain the
- * caller's Activity.
+ * This implementation coordinates [Transport] implementations, the [TransportSelector] for
+ * compatibility heuristics, and the [ScreenCaptureEngine] / [VideoEncoder] media pipeline.
  */
 class MirrorClient(context: Context) {
 
     @Suppress("unused", "MemberVisibilityCanBePrivate")
     protected val appContext: Context = context.applicationContext
+    
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+
+    private val transportSelector = TransportSelector(appContext)
+    
+    private val transports: Map<TransportId, Transport> = mapOf(
+        TransportId.MIRACAST to MiracastTransport(appContext),
+        TransportId.LAN to LanTransport(appContext)
+    )
 
     private val _state = MutableStateFlow<MirrorState>(MirrorState.Idle)
 
     /** Observable session state. Hot, never replays multiple values per subscriber. */
     val state: StateFlow<MirrorState> = _state.asStateFlow()
 
-    /** Begin discovering receivers across both transports (per allow-list). */
+    private val _stats = MutableStateFlow(SessionStats())
+    /** Observable performance metrics for the active session. */
+    val stats: StateFlow<SessionStats> = _stats.asStateFlow()
+
+    private var discoveryJob: Job? = null
+    private var sessionJob: Job? = null
+    
+    private var activeSession: TransportSession? = null
+    private var captureEngine: ScreenCaptureEngine? = null
+    private var videoEncoder: VideoEncoder? = null
+    
+    private val discoveredTargets = mutableMapOf<Receiver, TransportTarget>()
+    private var lastConfig: MirrorConfig? = null
+    
+    private var currentBitrateBps = 0
+    private var highQueueStartTime = 0L
+
+    /** Begin discovering receivers across both transports. */
     fun startDiscovery() {
-        // Phase 1.5 will wire this to MiracastTransport + LanTransport via TransportSelector.
-        notImplemented("startDiscovery")
+        stopDiscovery()
+        _state.value = MirrorState.Discovering
+        
+        discoveryJob = scope.launch {
+            // Combine discovery results from all available transports
+            val discoveryFlows = transports.values.map { transport ->
+                transport.startDiscovery().map { targets ->
+                    targets.map { target ->
+                        val receiver = Receiver(
+                            name = target.name,
+                            host = target.host,
+                            port = target.port,
+                            transport = if (target.transportId == TransportId.MIRACAST) Transport.MIRACAST else Transport.LAN
+                        )
+                        receiver to target
+                    }
+                }
+            }
+
+            combine(discoveryFlows) { lists ->
+                lists.flatMap { it }
+            }.collect { pairs ->
+                discoveredTargets.clear()
+                pairs.forEach { (receiver, target) -> discoveredTargets[receiver] = target }
+                _state.value = MirrorState.ReceiversFound(pairs.map { it.first })
+            }
+        }
     }
 
     /** Stop discovery; safe to call when not discovering. */
     fun stopDiscovery() {
-        notImplemented("stopDiscovery")
+        discoveryJob?.cancel()
+        discoveryJob = null
+        if (_state.value is MirrorState.Discovering || _state.value is MirrorState.ReceiversFound) {
+            _state.value = MirrorState.Idle
+        }
     }
 
     /** Connect to a [Receiver] returned in [MirrorState.ReceiversFound]. */
-    @Suppress("UNUSED_PARAMETER")
     fun connect(receiver: Receiver, config: MirrorConfig = MirrorConfig()) {
-        notImplemented("connect")
+        val target = discoveredTargets[receiver] ?: run {
+            _state.value = MirrorState.Error(MirrorError.NetworkUnreachable(receiver.host), false)
+            return
+        }
+        startSession(target, config)
     }
 
     /** Connect manually by host/port (LAN only). Bypasses discovery. */
-    @Suppress("UNUSED_PARAMETER")
     fun connectManual(host: String, port: Int = 8765, config: MirrorConfig = MirrorConfig()) {
-        notImplemented("connectManual")
+        val target = object : TransportTarget {
+            override val name: String = host
+            override val host: String = host
+            override val port: Int = port
+            override val transportId: TransportId = TransportId.LAN
+        }
+        startSession(target, config)
+    }
+
+    private fun startSession(target: TransportTarget, config: MirrorConfig) {
+        stopDiscovery()
+        lastConfig = config
+        currentBitrateBps = config.bitrateBps
+        
+        sessionJob?.cancel()
+        sessionJob = scope.launch {
+            var attempts = 0
+            val maxAttempts = 3
+            
+            while (isActive && attempts < maxAttempts) {
+                _state.value = MirrorState.Connecting
+                try {
+                    val transport = transports[target.transportId] ?: throw IllegalStateException("Transport not found")
+                    
+                    Log.i(TAG, "Starting session via ${target.transportId} to ${target.name} (Attempt ${attempts + 1})")
+                    val session = transport.connect(target, config)
+                    activeSession = session
+                    
+                    // Collect stats
+                    launch {
+                        session.stats.collect { stats ->
+                            _stats.value = stats
+                            handleCongestion(stats)
+                        }
+                    }
+
+                    _state.value = MirrorState.AwaitingProjection
+                    
+                    // Monitor session events (control signals from peer)
+                    session.events.collect { event ->
+                        when (event) {
+                            TransportEvent.RequestKeyframe -> {
+                                Log.d(TAG, "Peer requested keyframe")
+                                videoEncoder?.requestKeyframe()
+                            }
+                            is TransportEvent.PeerDisconnected -> {
+                                Log.i(TAG, "Peer disconnected: ${event.reason}")
+                                disconnect()
+                            }
+                            is TransportEvent.Error -> {
+                                Log.e(TAG, "Transport error: ${event.cause.message}")
+                                _state.value = MirrorState.Error(event.cause, false)
+                                disconnect()
+                            }
+                        }
+                    }
+                    return@launch // Success!
+                    
+                } catch (e: Exception) {
+                    attempts++
+                    if (attempts >= maxAttempts) {
+                        Log.e(TAG, "All $maxAttempts connection attempts failed: ${e.message}")
+                        _state.value = MirrorState.Error(
+                            if (e is MirrorError) e else MirrorError.NetworkUnreachable(target.host, e),
+                            true
+                        )
+                        break
+                    }
+                    
+                    val backoffMs = (2.0.pow(attempts - 1) * 1000).toLong() // 1s, 2s, 4s
+                    Log.w(TAG, "Connection attempt $attempts failed: ${e.message}. Retrying in ${backoffMs}ms...")
+                    delay(backoffMs)
+                }
+            }
+        }
     }
 
     /**
@@ -73,24 +194,107 @@ class MirrorClient(context: Context) {
      *
      * Call from your launcher callback after starting `MediaProjectionManager.createScreenCaptureIntent()`.
      */
-    @Suppress("UNUSED_PARAMETER")
     fun onProjectionGranted(resultCode: Int, data: Intent) {
-        notImplemented("onProjectionGranted")
+        val session = activeSession ?: run {
+            Log.w(TAG, "onProjectionGranted called but no active session")
+            return
+        }
+        val config = lastConfig ?: MirrorConfig()
+        
+        val mpm = appContext.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        val projection = mpm.getMediaProjection(resultCode, data) ?: run {
+            _state.value = MirrorState.Error(MirrorError.ProjectionDenied(), false)
+            return
+        }
+
+        Log.i(TAG, "Projection granted, starting media pipeline")
+
+        val encoder = VideoEncoder(
+            width = config.width,
+            height = config.height,
+            bitrateBps = config.bitrateBps,
+            frameRate = config.fps
+        )
+        val capture = ScreenCaptureEngine(projection, encoder)
+        
+        // Wire the pipeline: Encoder -> TransportSession
+        capture.setNalUnitCallback { bytes, ts ->
+            session.videoSink.trySend(NalUnit(bytes, ts))
+        }
+        
+        videoEncoder = encoder
+        captureEngine = capture
+        
+        try {
+            // Default to 160 DPI
+            capture.start(config.width, config.height, 160)
+            _state.value = MirrorState.Streaming
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to start capture: ${e.message}", e)
+            _state.value = MirrorState.Error(MirrorError.EncoderFailure(e), false)
+            disconnect()
+        }
     }
 
     /** Stop the active session, if any. Idempotent. */
     fun disconnect() {
-        notImplemented("disconnect")
+        sessionJob?.cancel()
+        sessionJob = null
+        
+        scope.launch {
+            activeSession?.close("User disconnected")
+            activeSession = null
+            
+            captureEngine?.stop()
+            captureEngine = null
+            videoEncoder = null
+            
+            _state.value = MirrorState.Idle
+        }
     }
 
     /** Release any retained resources. The instance is unusable afterward. */
     fun release() {
-        notImplemented("release")
+        disconnect()
+        scope.cancel()
     }
 
-    private fun notImplemented(method: String): Nothing =
-        throw NotImplementedError(
-            "MirrorClient.$method is a Phase 1 stub. " +
-                "Implementation lands in Phase 1.5 / Phase 2; see docs/lan-mirror/tasks.md."
+    /** Helper to load [MirrorConfig] from app [SharedPreferences]. */
+    fun loadConfigFromPrefs(prefs: android.content.SharedPreferences): MirrorConfig {
+        val bitrate = prefs.getString("bitrate", "4000000")?.toIntOrNull() ?: 4_000_000
+        val resolution = prefs.getString("resolution", "720p") ?: "720p"
+        val transportMode = prefs.getString("transport_mode", "auto") ?: "auto"
+        
+        val (w, h) = if (resolution == "1080p") 1920 to 1080 else 1280 to 720
+        
+        val transport = when (transportMode) {
+            "miracast" -> Transport.MIRACAST
+            "lan" -> Transport.LAN
+            else -> Transport.AUTO
+        }
+        
+        return MirrorConfig(
+            width = w,
+            height = h,
+            bitrateBps = bitrate,
+            transport = transport
         )
+    }
+
+    private fun handleCongestion(stats: SessionStats) {
+        if (stats.queueDepth > 15) {
+            if (highQueueStartTime == 0L) highQueueStartTime = System.currentTimeMillis()
+            if (System.currentTimeMillis() - highQueueStartTime > 2000) {
+                val nextBitrate = (currentBitrateBps * 0.7).toInt().coerceAtLeast(500_000)
+                if (nextBitrate < currentBitrateBps) {
+                    Log.w(TAG, "Congestion detected (queue depth ${stats.queueDepth}). Scaling bitrate down to $nextBitrate bps")
+                    videoEncoder?.setBitrate(nextBitrate)
+                    currentBitrateBps = nextBitrate
+                }
+                highQueueStartTime = 0
+            }
+        } else {
+            highQueueStartTime = 0
+        }
+    }
 }

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="bitrate_entries">
+        <item>1 Mbps</item>
+        <item>2 Mbps</item>
+        <item>4 Mbps (Default)</item>
+        <item>8 Mbps</item>
+    </string-array>
+    <string-array name="bitrate_values">
+        <item>1000000</item>
+        <item>2000000</item>
+        <item>4000000</item>
+        <item>8000000</item>
+    </string-array>
+
+    <string-array name="resolution_entries">
+        <item>720p (Fast)</item>
+        <item>1080p (HQ)</item>
+    </string-array>
+    <string-array name="resolution_values">
+        <item>720p</item>
+        <item>1080p</item>
+    </string-array>
+
+    <string-array name="transport_entries">
+        <item>Auto (Smart Selection)</item>
+        <item>Miracast Only</item>
+        <item>LAN Only</item>
+    </string-array>
+    <string-array name="transport_values">
+        <item>auto</item>
+        <item>miracast</item>
+        <item>lan</item>
+    </string-array>
+</resources>

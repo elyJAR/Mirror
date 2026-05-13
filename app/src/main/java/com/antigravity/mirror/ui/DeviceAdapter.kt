@@ -1,23 +1,24 @@
 package com.antigravity.mirror.ui
 
-import android.net.wifi.p2p.WifiP2pDevice
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.antigravity.mirror.R
+import com.antigravity.mirror.stream.api.Receiver
 
 /**
- * RecyclerView adapter that displays a list of discovered Wi-Fi Direct peer devices.
+ * RecyclerView adapter that displays a list of discovered screen mirror receivers.
  *
- * Each item shows the device name and MAC address. Tapping an item invokes [onDeviceClick].
+ * Each item shows the receiver name and its host address/port.
+ * Tapping an item invokes [onDeviceClick].
  *
  * Requirements: 6.1, 6.2
  */
 class DeviceAdapter(
-    private var devices: List<WifiP2pDevice>,
-    private val onDeviceClick: (WifiP2pDevice) -> Unit
+    private var devices: List<Receiver>,
+    private val onDeviceClick: (Receiver) -> Unit
 ) : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
 
     // -------------------------------------------------------------------------
@@ -41,8 +42,8 @@ class DeviceAdapter(
 
     override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) {
         val device = devices[position]
-        holder.deviceName.text = device.deviceName.ifBlank { "Unknown Device" }
-        holder.deviceAddress.text = device.deviceAddress
+        holder.deviceName.text = device.name.ifBlank { "Unknown Receiver" }
+        holder.deviceAddress.text = "${device.host}:${device.port} (${device.transport})"
         holder.itemView.setOnClickListener { onDeviceClick(device) }
     }
 
@@ -53,11 +54,11 @@ class DeviceAdapter(
     // -------------------------------------------------------------------------
 
     /**
-     * Replaces the current device list and refreshes the RecyclerView.
+     * Replaces the current receiver list and refreshes the RecyclerView.
      *
-     * @param newDevices The updated list of discovered [WifiP2pDevice] peers.
+     * @param newDevices The updated list of discovered [Receiver] peers.
      */
-    fun updateDevices(newDevices: List<WifiP2pDevice>) {
+    fun updateDevices(newDevices: List<Receiver>) {
         devices = newDevices
         notifyDataSetChanged()
     }

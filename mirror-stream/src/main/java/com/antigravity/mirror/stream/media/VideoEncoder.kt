@@ -26,6 +26,43 @@ class VideoEncoder(
     private val frameRate: Int
 ) {
 
+    /**
+     * Force the encoder to produce an IDR frame as soon as possible.
+     *
+     * Used when the transport layer detects a protocol violation or a new receiver
+     * joins mid-session.
+     */
+    fun requestKeyframe() {
+        if (!isRunning) return
+        val params = android.os.Bundle().apply {
+            putInt(MediaCodec.PARAMETER_KEY_REQUEST_SYNC_FRAME, 0)
+        }
+        try {
+            codec.setParameters(params)
+            Log.i(TAG, "Dynamic keyframe requested")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to request keyframe: ${e.message}")
+        }
+    }
+
+    /**
+     * Dynamically updates the encoder's target bitrate.
+     * 
+     * Requirements: tasks.md §6.3
+     */
+    fun setBitrate(bitrateBps: Int) {
+        if (!isRunning) return
+        val params = android.os.Bundle().apply {
+            putInt(MediaCodec.PARAMETER_KEY_VIDEO_BITRATE, bitrateBps)
+        }
+        try {
+            codec.setParameters(params)
+            Log.i(TAG, "Dynamic bitrate updated to $bitrateBps bps")
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to update bitrate: ${e.message}")
+        }
+    }
+
     private lateinit var codec: MediaCodec
 
     @Volatile
