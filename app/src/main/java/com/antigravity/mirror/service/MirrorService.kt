@@ -248,7 +248,7 @@ class MirrorService : Service() {
      * Initiates a Miracast session with the selected [device].
      *
      * Detects the connection type, transitions to [MirrorState.Connecting], and collects
-     * from [DiscoveryManager.connectAsGroupOwner]. On success, stores the GO address and
+     * from [DiscoveryManager.connectToDevice]. On success, stores the GO address and
      * transitions to [MirrorState.AwaitingProjectionConsent] so the Activity can launch
      * the MediaProjection consent dialog.
      *
@@ -269,10 +269,10 @@ class MirrorService : Service() {
 
         connectionJob?.cancel()
         connectionJob = serviceScope.launch {
-            discoveryManager.connectAsGroupOwner(device).collect { event ->
+            discoveryManager.connectToDevice(device).collect { event ->
                 when (event) {
                     is ConnectionEvent.Connected -> {
-                        Log.i(TAG, "Connected as GO, address=${event.groupOwnerAddress}")
+                        Log.i(TAG, "Wi-Fi Direct group formed, goAddress=${event.groupOwnerAddress}")
                         goAddress = event.groupOwnerAddress
                         _state.value = MirrorState.AwaitingProjectionConsent
                         // The Activity will now launch the MediaProjection consent dialog

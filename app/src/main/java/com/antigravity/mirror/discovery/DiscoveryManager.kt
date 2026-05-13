@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.net.wifi.WifiManager
 import android.net.wifi.p2p.WifiP2pConfig
 import android.net.wifi.p2p.WifiP2pDevice
+import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Looper
 import android.util.Log
@@ -144,17 +145,30 @@ class DiscoveryManager(private val context: Context) {
     }
 
     /**
-     * Connects to [device] as the Wi-Fi Direct Group Owner (groupOwnerIntent = 15).
+     * Connects to [device] over Wi-Fi Direct.
      *
-     * Emits [ConnectionEvent.Connected] with the GO IP address (`192.168.49.1`) on success, or
-     * [ConnectionEvent.Failed] on error.
+     * Uses `groupOwnerIntent = 0` so the **peer** (e.g. the Windows Connect app, which
+     * advertises itself as a Miracast sink and expects to be the Group Owner) wins GO
+     * negotiation. The phone joins as a P2P client and receives a DHCP-assigned IP
+     * from the GO; the GO's IP is read from [WifiP2pInfo.groupOwnerAddress] on the
+     * [WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION] broadcast.
      *
-     * Listens for [WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION] to confirm the connection.
+     * Before calling `connect()`, this method:
+     *  1. Stops in-progress peer discovery (otherwise `connect()` returns
+     *     [WifiP2pManager.BUSY]).
+     *  2. Calls `removeGroup()` to tear down any stale group left over from a previous
+     *     crashed session.
+     *
+     * Emits [ConnectionEvent.Connected] with the actual GO IP on success, or
+     * [ConnectionEvent.Failed] with the real [WifiP2pManager] reason code on error.
      */
-    fun connectAsGroupOwner(device: WifiP2pDevice): Flow<ConnectionEvent> = callbackFlow {
+    fun connectToDevice(device: WifiP2pDevice): Flow<ConnectionEvent> = callbackFlow {
         val config = WifiP2pConfig().apply {
             deviceAddress = device.deviceAddress
-            groupOwnerIntent = 15
+            // Let the peer (Miracast sink / Windows Connect) become the Group Owner.
+            // Forcing 15 here causes negotiation to fail or leaves the phone as the
+            // unexpected GO, which Windows then refuses to stream to.
+            groupOwnerIntent = 0
         }
 
         // Capture the channel so callbacks outside the lambda can emit events
@@ -162,17 +176,26 @@ class DiscoveryManager(private val context: Context) {
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
-                when (intent.action) {
-                    WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-                        wifiP2pManager.requestGroupInfo(p2pChannel) { group ->
-                            if (group != null && group.isGroupOwner) {
-                                Log.i(TAG, "Group formed — we are the GO")
-                                channel.trySend(ConnectionEvent.Connected(
-                                    InetAddress.getByName("192.168.49.1")
-                                ))
-                                channel.close()
-                            }
+                if (intent.action != WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION) return
+
+                @Suppress("DEPRECATION")
+                val info: WifiP2pInfo? =
+                    intent.getParcelableExtra(WifiP2pManager.EXTRA_WIFI_P2P_INFO)
+
+                if (info != null && info.groupFormed) {
+                    val goAddress: InetAddress? = info.groupOwnerAddress
+                    if (goAddress != null) {
+                        Log.i(
+                            TAG,
+                            "Group formed — isGroupOwner=${info.isGroupOwner}, " +
+                                "goAddress=${goAddress.hostAddress}"
+                        )
+                        if (!channel.isClosedForSend) {
+                            channel.trySend(ConnectionEvent.Connected(goAddress))
+                            channel.close()
                         }
+                    } else {
+                        Log.w(TAG, "Group formed but groupOwnerAddress is null — waiting")
                     }
                 }
             }
@@ -184,16 +207,18 @@ class DiscoveryManager(private val context: Context) {
         context.registerReceiver(receiver, intentFilter)
 
         // Stop any in-progress discovery FIRST. Calling connect() while discoverPeers()
-        // is still running returns WifiP2pManager.BUSY (reason=1).
+        // is still running returns WifiP2pManager.BUSY (reason=1). Then remove any
+        // stale group left from a previous session so the framework doesn't reject
+        // the new connect() with ERROR.
         wifiP2pManager.stopPeerDiscovery(p2pChannel, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
-                Log.d(TAG, "stopPeerDiscovery succeeded — proceeding to connect()")
-                initiateConnect(config, channel)
+                Log.d(TAG, "stopPeerDiscovery succeeded — clearing stale group")
+                clearStaleGroupThenConnect(config, channel)
             }
             override fun onFailure(reason: Int) {
                 // Failure here just means discovery wasn't running — safe to proceed
-                Log.d(TAG, "stopPeerDiscovery failed (reason=$reason) — proceeding to connect() anyway")
-                initiateConnect(config, channel)
+                Log.d(TAG, "stopPeerDiscovery failed (reason=$reason) — clearing stale group anyway")
+                clearStaleGroupThenConnect(config, channel)
             }
         })
 
@@ -219,6 +244,30 @@ class DiscoveryManager(private val context: Context) {
         }
     }
 
+    /**
+     * Removes any existing P2P group (best-effort) before initiating a new connect.
+     * A stale group from a previous crashed session will cause `connect()` to fail
+     * with [WifiP2pManager.ERROR] until the group is torn down.
+     */
+    private fun clearStaleGroupThenConnect(
+        config: WifiP2pConfig,
+        channel: kotlinx.coroutines.channels.SendChannel<ConnectionEvent>
+    ) {
+        wifiP2pManager.removeGroup(p2pChannel, object : WifiP2pManager.ActionListener {
+            override fun onSuccess() {
+                Log.d(TAG, "removeGroup succeeded — proceeding to connect()")
+                initiateConnect(config, channel)
+            }
+            override fun onFailure(reason: Int) {
+                // Reason 2 (NO_SERVICE_REQUESTS / no group) is expected when there's
+                // nothing to remove; any other failure we also proceed since connect()
+                // will surface the real reason.
+                Log.d(TAG, "removeGroup failed (reason=$reason) — proceeding to connect() anyway")
+                initiateConnect(config, channel)
+            }
+        })
+    }
+
     private fun initiateConnect(
         config: WifiP2pConfig,
         channel: kotlinx.coroutines.channels.SendChannel<ConnectionEvent>
@@ -226,23 +275,47 @@ class DiscoveryManager(private val context: Context) {
         wifiP2pManager.connect(p2pChannel, config, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
                 Log.d(TAG, "connect() initiated — waiting for WIFI_P2P_CONNECTION_CHANGED_ACTION")
-                // Also check immediately in case we are already the GO
-                wifiP2pManager.requestGroupInfo(p2pChannel) { group ->
-                    if (group != null && group.isGroupOwner && !channel.isClosedForSend) {
-                        Log.i(TAG, "Already group owner after connect()")
-                        channel.trySend(ConnectionEvent.Connected(
-                            InetAddress.getByName("192.168.49.1")
-                        ))
+                // Also check immediately in case the group already exists
+                wifiP2pManager.requestConnectionInfo(p2pChannel) { info ->
+                    if (info != null && info.groupFormed && info.groupOwnerAddress != null &&
+                        !channel.isClosedForSend
+                    ) {
+                        Log.i(
+                            TAG,
+                            "Group already formed after connect() — " +
+                                "isGroupOwner=${info.isGroupOwner}, " +
+                                "goAddress=${info.groupOwnerAddress.hostAddress}"
+                        )
+                        channel.trySend(ConnectionEvent.Connected(info.groupOwnerAddress))
                         channel.close()
                     }
                 }
             }
             override fun onFailure(reason: Int) {
-                // NOTE: Android frequently calls onFailure(ERROR=0) even when the connection
-                // actually succeeds in the background. Do NOT treat this as fatal — just log
-                // it and let the WIFI_P2P_CONNECTION_CHANGED_ACTION broadcast be the source
-                // of truth. The 30-second timeout will handle genuine failures.
-                Log.w(TAG, "connect() onFailure(reason=$reason) — continuing to wait for broadcast (may still succeed)")
+                // BUSY (1) and P2P_UNSUPPORTED (2) are deterministic failures — surface
+                // them immediately so the user sees a useful error instead of waiting
+                // for the 30-second timeout to fire a generic ERROR.
+                //
+                // ERROR (0) is known to be reported by some OEMs even when the connection
+                // actually succeeds via the broadcast, so for ERROR we keep waiting and
+                // let the timeout decide.
+                when (reason) {
+                    WifiP2pManager.BUSY,
+                    WifiP2pManager.P2P_UNSUPPORTED -> {
+                        Log.e(TAG, "connect() onFailure(reason=$reason) — failing fast")
+                        if (!channel.isClosedForSend) {
+                            channel.trySend(ConnectionEvent.Failed(reason))
+                            channel.close()
+                        }
+                    }
+                    else -> {
+                        Log.w(
+                            TAG,
+                            "connect() onFailure(reason=$reason) — continuing to wait for broadcast " +
+                                "(some OEMs report ERROR spuriously)"
+                        )
+                    }
+                }
             }
         })
     }
@@ -273,9 +346,12 @@ sealed class DiscoveryEvent {
     data class DiscoveryFailed(val reason: Int) : DiscoveryEvent()
 }
 
-/** Events emitted by [DiscoveryManager.connectAsGroupOwner]. */
+/** Events emitted by [DiscoveryManager.connectToDevice]. */
 sealed class ConnectionEvent {
-    /** Connection succeeded; [groupOwnerAddress] is the IP of the Group Owner (`192.168.49.1`). */
+    /**
+     * Connection succeeded; [groupOwnerAddress] is the IP of the Group Owner, read from
+     * [WifiP2pManager.EXTRA_WIFI_P2P_INFO] on the connection-changed broadcast.
+     */
     data class Connected(val groupOwnerAddress: InetAddress) : ConnectionEvent()
 
     /**
