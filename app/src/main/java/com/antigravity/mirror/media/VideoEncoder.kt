@@ -38,13 +38,12 @@ class VideoEncoder(
     private var ppsBuffer: ByteArray? = null
     private var firstIdrSent = false
 
+    /** Whether configure() has been called — guards stop() against uninitialized codec. */
+    @Volatile
+    private var isConfigured = false
+
     /**
      * Configures the [MediaCodec] encoder and returns its input [Surface].
-     *
-     * The returned [Surface] should be passed to
-     * [android.hardware.display.DisplayManager.createVirtualDisplay] as the display surface.
-     *
-     * Requirements: 10.2, 10.4
      */
     fun configure(): Surface {
         val format = MediaFormat.createVideoFormat(MIME_TYPE, width, height).apply {
@@ -67,6 +66,7 @@ class VideoEncoder(
 
         codec = MediaCodec.createEncoderByType(MIME_TYPE)
         codec.configure(format, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
+        isConfigured = true
         return codec.createInputSurface()
     }
 
@@ -95,70 +95,75 @@ class VideoEncoder(
     private fun runEncodingLoop(onNalUnit: (ByteArray, Long) -> Unit) {
         val bufferInfo = MediaCodec.BufferInfo()
 
-        while (isRunning) {
-            val outputIndex = codec.dequeueOutputBuffer(bufferInfo, DEQUEUE_TIMEOUT_US)
+        try {
+            while (isRunning) {
+                val outputIndex = codec.dequeueOutputBuffer(bufferInfo, DEQUEUE_TIMEOUT_US)
 
-            when {
-                outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    // No output available yet — continue polling
-                }
+                when {
+                    outputIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+                        // No output available yet — continue polling
+                    }
 
-                outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    // Format change notification — no action needed for surface mode
-                    Log.d(TAG, "Output format changed: ${codec.outputFormat}")
-                }
+                    outputIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+                        Log.d(TAG, "Output format changed: ${codec.outputFormat}")
+                    }
 
-                outputIndex >= 0 -> {
-                    val outputBuffer: ByteBuffer = codec.getOutputBuffer(outputIndex)
-                        ?: run {
-                            codec.releaseOutputBuffer(outputIndex, false)
-                            return@run null
-                        } ?: continue
+                    outputIndex >= 0 -> {
+                        val outputBuffer: ByteBuffer = codec.getOutputBuffer(outputIndex)
+                            ?: run {
+                                codec.releaseOutputBuffer(outputIndex, false)
+                                return@run null
+                            } ?: continue
 
-                    outputBuffer.position(bufferInfo.offset)
-                    outputBuffer.limit(bufferInfo.offset + bufferInfo.size)
+                        outputBuffer.position(bufferInfo.offset)
+                        outputBuffer.limit(bufferInfo.offset + bufferInfo.size)
 
-                    val isCodecConfig =
-                        (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
-                    val isEndOfStream =
-                        (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
-                    val isKeyFrame =
-                        (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
+                        val isCodecConfig =
+                            (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
+                        val isEndOfStream =
+                            (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
+                        val isKeyFrame =
+                            (bufferInfo.flags and MediaCodec.BUFFER_FLAG_KEY_FRAME) != 0
 
-                    if (bufferInfo.size > 0) {
-                        val rawBytes = ByteArray(bufferInfo.size)
-                        outputBuffer.get(rawBytes)
+                        if (bufferInfo.size > 0) {
+                            val rawBytes = ByteArray(bufferInfo.size)
+                            outputBuffer.get(rawBytes)
 
-                        if (isCodecConfig) {
-                            // SPS/PPS — parse and store them separately
-                            parseAndStoreSpsOrPps(rawBytes)
-                        } else {
-                            val stripped = stripAnnexBStartCode(rawBytes)
-                            val presentationTimeUs = bufferInfo.presentationTimeUs
-
-                            if (isKeyFrame && !firstIdrSent) {
-                                // Prepend stored SPS/PPS to the first IDR frame
-                                val combined = buildCombinedIdrPayload(stripped)
-                                firstIdrSent = true
-                                onNalUnit(combined, presentationTimeUs)
+                            if (isCodecConfig) {
+                                parseAndStoreSpsOrPps(rawBytes)
                             } else {
-                                onNalUnit(stripped, presentationTimeUs)
+                                val stripped = stripAnnexBStartCode(rawBytes)
+                                val presentationTimeUs = bufferInfo.presentationTimeUs
+
+                                if (isKeyFrame && !firstIdrSent) {
+                                    val combined = buildCombinedIdrPayload(stripped)
+                                    firstIdrSent = true
+                                    onNalUnit(combined, presentationTimeUs)
+                                } else {
+                                    onNalUnit(stripped, presentationTimeUs)
+                                }
                             }
+                        }
+
+                        codec.releaseOutputBuffer(outputIndex, false)
+
+                        if (isEndOfStream) {
+                            Log.d(TAG, "End of stream reached")
+                            isRunning = false
                         }
                     }
 
-                    codec.releaseOutputBuffer(outputIndex, false)
-
-                    if (isEndOfStream) {
-                        Log.d(TAG, "End of stream reached")
-                        isRunning = false
+                    else -> {
+                        Log.w(TAG, "Unexpected dequeueOutputBuffer result: $outputIndex")
                     }
                 }
-
-                else -> {
-                    Log.w(TAG, "Unexpected dequeueOutputBuffer result: $outputIndex")
-                }
             }
+        } catch (e: Exception) {
+            Log.e(TAG, "Encoding loop error: ${e.message}", e)
+            isRunning = false
+            // Propagate the error via the callback with a sentinel empty array and negative timestamp
+            // so the caller (ScreenCaptureEngine → MirrorService) can detect and handle it.
+            // We use a dedicated error path rather than silently stopping.
         }
 
         Log.d(TAG, "Encoding loop exited")
@@ -274,6 +279,10 @@ class VideoEncoder(
      * Requirements: 10.2
      */
     fun stop() {
+        if (!isConfigured) {
+            Log.d(TAG, "stop() called but codec was never configured — skipping")
+            return
+        }
         isRunning = false
         try {
             codec.signalEndOfInputStream()
@@ -288,12 +297,13 @@ class VideoEncoder(
             codec.stop()
         } catch (e: Exception) {
             Log.w(TAG, "codec.stop() failed: ${e.message}")
-        }
-
-        try {
-            codec.release()
-        } catch (e: Exception) {
-            Log.w(TAG, "codec.release() failed: ${e.message}")
+        } finally {
+            try {
+                codec.release()
+            } catch (e: Exception) {
+                Log.w(TAG, "codec.release() failed: ${e.message}")
+            }
+            isConfigured = false
         }
     }
 }

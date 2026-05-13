@@ -397,22 +397,23 @@ class WfdSessionManager(
      * @return The parsed RTP port, or [SOURCE_RTP_PORT] as a fallback if parsing fails.
      */
     internal fun parseClientRtpPort(transportHeader: String): Int {
-        // Split on semicolons and find the client_port parameter
         val parts = transportHeader.split(";")
         for (part in parts) {
             val trimmed = part.trim()
             if (trimmed.startsWith("client_port=", ignoreCase = true)) {
                 val portValue = trimmed.substringAfter("=").trim()
-                // Port may be "rtpPort-rtcpPort" or just "rtpPort"
                 val rtpPortStr = portValue.substringBefore("-").trim()
                 val parsed = rtpPortStr.toIntOrNull()
-                if (parsed != null && parsed > 0) {
+                if (parsed != null && parsed in 1..65535) {
                     return parsed
                 }
             }
         }
-        Log.w(TAG, "Could not parse client_port from Transport header: '$transportHeader', using fallback $SOURCE_RTP_PORT")
-        return SOURCE_RTP_PORT
+        // Cannot parse the sink's RTP port — throw so the session fails clearly
+        // rather than silently sending RTP to the wrong port.
+        throw IllegalArgumentException(
+            "Could not parse client_port from Transport header: '$transportHeader'"
+        )
     }
 
     // -------------------------------------------------------------------------

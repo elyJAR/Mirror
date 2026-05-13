@@ -70,22 +70,23 @@ class ConnectionTypeSelector(private val context: Context) {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             val network = connectivityManager.activeNetwork ?: return false
             val caps = connectivityManager.getNetworkCapabilities(network) ?: return false
-            val hasWifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
-            // Exclude hotspot: when acting as a hotspot the device's own WiFi radio is in AP
-            // mode and networkId is -1 (not associated with any AP).
-            val networkId = wifiManager.connectionInfo?.networkId ?: -1
-            val isConnectedToAp = networkId != -1
-            Log.d(tag, "isWifiAvailable (API 23+): hasWifi=$hasWifi, networkId=$networkId")
-            hasWifi && isConnectedToAp
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // API 31+: connectionInfo requires NEARBY_WIFI_DEVICES permission which we
+                // may not have at this point. Use transport + internet capability as a proxy.
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            } else {
+                // API 23–30: safe to use connectionInfo (requires only ACCESS_WIFI_STATE)
+                val hasWifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+                @Suppress("DEPRECATION")
+                val networkId = wifiManager.connectionInfo?.networkId ?: -1
+                hasWifi && networkId != -1
+            }
         } else {
             @Suppress("DEPRECATION")
             val info = connectivityManager.getActiveNetworkInfo()
             @Suppress("DEPRECATION")
-            val available = info != null &&
-                info.isConnected &&
-                info.type == ConnectivityManager.TYPE_WIFI
-            Log.d(tag, "isWifiAvailable (legacy): available=$available")
-            available
+            info != null && info.isConnected && info.type == ConnectivityManager.TYPE_WIFI
         }
     }
 
@@ -102,35 +103,40 @@ class ConnectionTypeSelector(private val context: Context) {
      */
     fun isHotspotAvailable(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val networkId = wifiManager.connectionInfo?.networkId ?: -1
-            val wifiEnabled = wifiManager.isWifiEnabled
-            // WiFi radio is on but not connected to any AP → likely in hotspot/AP mode
-            if (!wifiEnabled || networkId != -1) {
-                Log.d(tag, "isHotspotAvailable (API 23+): false (wifiEnabled=$wifiEnabled, networkId=$networkId)")
-                return false
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // API 31+: avoid connectionInfo. Check for a WiFi network that is NOT
+                // connected to the internet (hotspot networks typically have no internet
+                // capability from the device's own perspective when it is the AP).
+                val networks = connectivityManager.allNetworks
+                networks.any { network ->
+                    val caps = connectivityManager.getNetworkCapabilities(network)
+                    caps != null &&
+                        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                        !caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                }
+            } else {
+                // API 23–30: use connectionInfo safely
+                @Suppress("DEPRECATION")
+                val networkId = wifiManager.connectionInfo?.networkId ?: -1
+                val wifiEnabled = wifiManager.isWifiEnabled
+                if (!wifiEnabled || networkId != -1) return false
+                val networks = connectivityManager.allNetworks
+                networks.any { network ->
+                    val caps = connectivityManager.getNetworkCapabilities(network)
+                    caps != null &&
+                        caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
+                        caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                }
             }
-            // Confirm there is at least one active network with TRANSPORT_WIFI + NOT_VPN
-            val networks = connectivityManager.allNetworks
-            val hasHotspotNetwork = networks.any { network ->
-                val caps = connectivityManager.getNetworkCapabilities(network)
-                caps != null &&
-                    caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) &&
-                    caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-            }
-            Log.d(tag, "isHotspotAvailable (API 23+): hasHotspotNetwork=$hasHotspotNetwork")
-            hasHotspotNetwork
         } else {
             @Suppress("DEPRECATION")
             val info = connectivityManager.getActiveNetworkInfo()
             @Suppress("DEPRECATION")
-            val wifiConnected = info != null &&
-                info.isConnected &&
+            val wifiConnected = info != null && info.isConnected &&
                 info.type == ConnectivityManager.TYPE_WIFI
+            @Suppress("DEPRECATION")
             val networkId = wifiManager.connectionInfo?.networkId ?: -1
-            // WiFi active but not associated with an AP → hotspot mode
-            val available = wifiManager.isWifiEnabled && !wifiConnected && networkId == -1
-            Log.d(tag, "isHotspotAvailable (legacy): available=$available")
-            available
+            wifiManager.isWifiEnabled && !wifiConnected && networkId == -1
         }
     }
 

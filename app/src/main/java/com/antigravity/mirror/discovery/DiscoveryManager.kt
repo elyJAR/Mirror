@@ -20,6 +20,7 @@ import java.net.InetAddress
 
 private const val TAG = "MirrorApp/DiscoveryManager"
 private const val DISCOVERY_TIMEOUT_MS = 30_000L
+private const val CONNECTION_TIMEOUT_MS = 30_000L
 
 /** Synthetic reason code used when WiFi is disabled (not a WifiP2pManager code). */
 const val REASON_WIFI_DISABLED = -100
@@ -153,22 +154,19 @@ class DiscoveryManager(private val context: Context) {
     fun connectAsGroupOwner(device: WifiP2pDevice): Flow<ConnectionEvent> = callbackFlow {
         val config = WifiP2pConfig().apply {
             deviceAddress = device.deviceAddress
-            groupOwnerIntent = 15 // Maximum intent — force Android to be the Group Owner
+            groupOwnerIntent = 15
         }
 
         val receiver = object : BroadcastReceiver() {
             override fun onReceive(ctx: Context, intent: Intent) {
                 when (intent.action) {
                     WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION -> {
-                        // Request group info to confirm we are the GO
                         wifiP2pManager.requestGroupInfo(p2pChannel) { group ->
                             if (group != null && group.isGroupOwner) {
-                                // The GO IP is always 192.168.49.1 on Android
                                 val goAddress = InetAddress.getByName("192.168.49.1")
                                 trySend(ConnectionEvent.Connected(goAddress))
                                 close()
                             }
-                            // If group is null or we are not the GO yet, wait for next broadcast
                         }
                     }
                 }
@@ -180,10 +178,9 @@ class DiscoveryManager(private val context: Context) {
         }
         context.registerReceiver(receiver, intentFilter)
 
-        val actionListener = object : WifiP2pManager.ActionListener {
+        wifiP2pManager.connect(p2pChannel, config, object : WifiP2pManager.ActionListener {
             override fun onSuccess() {
-                Log.d(TAG, "connect() initiated successfully, waiting for connection changed broadcast")
-                // Also request group info immediately in case we are already connected
+                Log.d(TAG, "connect() initiated successfully")
                 wifiP2pManager.requestGroupInfo(p2pChannel) { group ->
                     if (group != null && group.isGroupOwner) {
                         val goAddress = InetAddress.getByName("192.168.49.1")
@@ -192,17 +189,27 @@ class DiscoveryManager(private val context: Context) {
                     }
                 }
             }
-
             override fun onFailure(reason: Int) {
                 Log.e(TAG, "connect() failed with reason: $reason")
                 trySend(ConnectionEvent.Failed(reason))
                 close()
             }
+        })
+
+        // 30-second timeout — emit Failed if connection never completes
+        val timeoutJob = launch {
+            withTimeoutOrNull(CONNECTION_TIMEOUT_MS) {
+                kotlinx.coroutines.delay(CONNECTION_TIMEOUT_MS)
+            }
+            if (!isClosedForSend) {
+                Log.w(TAG, "Connection timed out after ${CONNECTION_TIMEOUT_MS}ms")
+                trySend(ConnectionEvent.Failed(WifiP2pManager.ERROR))
+                close()
+            }
         }
 
-        wifiP2pManager.connect(p2pChannel, config, actionListener)
-
         awaitClose {
+            timeoutJob.cancel()
             try {
                 context.unregisterReceiver(receiver)
             } catch (e: IllegalArgumentException) {

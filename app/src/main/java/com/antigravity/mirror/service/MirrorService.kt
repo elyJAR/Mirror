@@ -16,6 +16,8 @@ import android.net.wifi.p2p.WifiP2pDevice
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Binder
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.ServiceCompat
@@ -120,14 +122,19 @@ class MirrorService : Service() {
      *
      * Requirements: 5.3, 5.4
      */
+    private val mainHandler = Handler(Looper.getMainLooper())
+
     private val networkCallback = object : ConnectivityManager.NetworkCallback() {
         override fun onLost(network: Network) {
-            Log.w(TAG, "Network lost during active session")
-            releaseAllResources()
-            _state.value = MirrorState.Error(
-                message = "Network connection lost",
-                recoverable = true
-            )
+            // onLost is called on a binder thread — post to main to safely update state
+            mainHandler.post {
+                Log.w(TAG, "Network lost during active session")
+                releaseAllResources()
+                _state.value = MirrorState.Error(
+                    message = "Network connection lost",
+                    recoverable = true
+                )
+            }
         }
     }
 

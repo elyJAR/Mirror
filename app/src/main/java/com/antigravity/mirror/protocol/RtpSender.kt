@@ -46,7 +46,8 @@ class RtpSender(
     /** Monotonically incrementing sequence number (wraps at 65535). */
     private var sequenceNumber: Int = 0
 
-    /** UDP socket opened lazily on first sendNalUnit() call. */
+    /** UDP socket opened lazily on first sendNalUnit() call. Volatile for cross-thread visibility. */
+    @Volatile
     private var socket: DatagramSocket? = null
 
     /**
