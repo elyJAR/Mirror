@@ -263,6 +263,19 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            is MirrorState.AwaitingPairing -> {
+                progressBar.visibility = View.GONE
+                statusText.text = getString(R.string.label_awaiting_pin)
+                statusText.visibility = View.VISIBLE
+                showPinInputDialog()
+            }
+
+            is MirrorState.Reconnecting -> {
+                progressBar.visibility = View.VISIBLE
+                statusText.text = getString(R.string.label_reconnecting)
+                statusText.visibility = View.VISIBLE
+            }
+
             is MirrorState.Streaming -> {
                 progressBar.visibility = View.GONE
                 statusText.text = getString(R.string.label_streaming)
@@ -277,7 +290,7 @@ class MainActivity : AppCompatActivity() {
                 progressBar.visibility = View.GONE
                 deviceList.visibility = View.VISIBLE
 
-                val message = state.error.message ?: "Unknown error"
+                val message = state.cause.message ?: "Unknown error"
                 statusText.text = message
                 statusText.visibility = View.VISIBLE
                 discoverButton.visibility = if (state.recoverable) View.VISIBLE else View.GONE
@@ -356,6 +369,29 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             .setNegativeButton(R.string.btn_cancel, null)
+            .show()
+    }
+
+    private fun showPinInputDialog() {
+        val input = EditText(this).apply {
+            inputType = InputType.TYPE_CLASS_NUMBER
+            hint = "0000"
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dialog_pin_title)
+            .setMessage(R.string.dialog_pin_message)
+            .setView(input)
+            .setPositiveButton(R.string.btn_connect) { _, _ ->
+                val pin = input.text.toString().trim()
+                if (pin.length == 4) {
+                    mirrorService?.submitPin(pin)
+                }
+            }
+            .setNegativeButton(R.string.btn_cancel) { _, _ ->
+                mirrorService?.disconnect()
+            }
+            .setCancelable(false)
             .show()
     }
 

@@ -25,9 +25,9 @@
     <string name="permission_rationale_location">Location permission is required for WiFi Direct device discovery on this Android version.</string>
     <string name="permission_rationale_nearby_wifi">Nearby WiFi Devices permission is required to discover Miracast receivers.</string>
     <string name="settings_open">Open Settings</string>
-    <string name="pin_dialog_title">Enter PIN</string>
-    <string name="pin_dialog_hint">PIN</string>
-    <string name="pin_dialog_ok">Connect</string>
-    <string name="pin_dialog_cancel">Cancel</string>
+    <string name="label_awaiting_pin">Waiting for PIN entry…</string>
+    <string name="label_reconnecting">Reconnecting…</string>
+    <string name="dialog_pin_title">Pairing Required</string>
+    <string name="dialog_pin_message">Enter the 4-digit PIN displayed on your PC screen.</string>
     <string name="error_incorrect_pin">Incorrect PIN. Please try again.</string>
 </resources>

@@ -89,6 +89,7 @@ class MirrorService : Service() {
     fun loadConfigFromPrefs(prefs: android.content.SharedPreferences) = client.loadConfigFromPrefs(prefs)
     fun onProjectionGranted(resultCode: Int, data: Intent) = client.onProjectionGranted(resultCode, data)
     fun disconnect() = client.disconnect()
+    fun submitPin(pin: String) = client.submitPin(pin)
     fun getState(): StateFlow<MirrorState> = client.state
     fun getStats(): StateFlow<com.antigravity.mirror.stream.api.SessionStats> = client.stats
 

@@ -43,7 +43,7 @@ class DeviceAdapter(
     override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) {
         val device = devices[position]
         holder.deviceName.text = device.name.ifBlank { "Unknown Receiver" }
-        holder.deviceAddress.text = "${device.host}:${device.port} (${device.transport})"
+        holder.deviceAddress.text = "${device.host}:${device.port} (${device.transportId})"
         holder.itemView.setOnClickListener { onDeviceClick(device) }
     }
 
