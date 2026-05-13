@@ -310,9 +310,9 @@ class MirrorClient(context: Context) {
         val (w, h) = if (resolution == "1080p") 1920 to 1080 else 1280 to 720
         
         val transport = when (transportMode) {
-            "miracast" -> Transport.MIRACAST
-            "lan" -> Transport.LAN
-            else -> Transport.AUTO
+            "miracast" -> TransportPreference.MIRACAST
+            "lan" -> TransportPreference.LAN
+            else -> TransportPreference.AUTO
         }
         
         return MirrorConfig(

@@ -41,8 +41,8 @@ class ProtocolClient(
     private val audioQueue = LinkedList<ByteArray>()
     private val queueSignal = Channel<Unit>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     
-    private val _events = MutableSharedFlow<ControlMessage>()
-    val events: SharedFlow<ControlMessage> = _events.asSharedFlow()
+    private val _events = MutableSharedFlow<Any>()
+    val events: SharedFlow<Any> = _events.asSharedFlow()
 
     private val _stats = MutableStateFlow(SessionStats())
     val stats: StateFlow<SessionStats> = _stats.asStateFlow()
@@ -122,7 +122,7 @@ class ProtocolClient(
             val msg = json.decodeFromString<ControlMessage>(String(ackFrame.payload))
             when (msg) {
                 is HelloAckMessage -> {
-                    this.negotiatedCodec = msg.params.codec
+                    negotiatedCodec = msg.params.codec
                     Log.i(TAG, "Handshake accepted by ${msg.receiver}. Negotiated: $negotiatedCodec")
                     
                     if (msg.pinRequired) {

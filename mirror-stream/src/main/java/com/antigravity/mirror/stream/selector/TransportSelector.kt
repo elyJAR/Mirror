@@ -8,7 +8,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
-import com.antigravity.mirror.stream.api.Transport
+import com.antigravity.mirror.stream.api.TransportPreference
 import com.antigravity.mirror.stream.transport.TransportId
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -45,11 +45,11 @@ class TransportSelector(
      * @param preference The user's preferred transport mode from [com.antigravity.mirror.stream.api.MirrorConfig].
      * @return A list of [TransportId]s to attempt.
      */
-    suspend fun selectTransports(preference: Transport): List<TransportId> {
+    suspend fun selectTransports(preference: TransportPreference): List<TransportId> {
         return when (preference) {
-            Transport.LAN -> listOf(TransportId.LAN)
-            Transport.MIRACAST -> listOf(TransportId.MIRACAST)
-            Transport.AUTO -> {
+            TransportPreference.LAN -> listOf(TransportId.LAN)
+            TransportPreference.MIRACAST -> listOf(TransportId.MIRACAST)
+            TransportPreference.AUTO -> {
                 val state = getMiracastState()
                 Log.d(TAG, "Auto-selection for $deviceFingerprint: state=$state")
                 

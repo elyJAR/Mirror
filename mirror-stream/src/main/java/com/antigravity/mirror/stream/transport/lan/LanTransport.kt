@@ -87,6 +87,9 @@ private class LanTransportSession(
                     is ByeMessage -> {
                         _events.emit(TransportEvent.PeerDisconnected(msg.reason))
                     }
+                    is TransportEvent -> {
+                        _events.emit(msg)
+                    }
                     else -> {
                         // Other messages (stats, etc) are logged by client; ignored here for now
                     }
