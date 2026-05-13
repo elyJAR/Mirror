@@ -3,9 +3,14 @@ name: Android CI
 on:
   push:
     branches: [ "main", "master" ]
+    tags:
+      - "v*"          # triggers the release job on any tag like v1.0.0, v1.2.3-beta, etc.
   pull_request:
     branches: [ "main", "master" ]
 
+# ---------------------------------------------------------------------------
+# CI job — runs on every push to main and every PR
+# ---------------------------------------------------------------------------
 jobs:
   build:
     name: Build & Test
@@ -41,7 +46,7 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test --stacktrace
 
-      - name: Upload debug APK
+      - name: Upload debug APK (CI artifact)
         uses: actions/upload-artifact@v4
         if: success()
         with:
@@ -56,3 +61,66 @@ jobs:
           name: test-results
           path: app/build/reports/tests/
           retention-days: 7
+
+# ---------------------------------------------------------------------------
+# Release job — runs only when a version tag (v*) is pushed
+# Builds both debug and release APKs and publishes them to GitHub Releases
+# ---------------------------------------------------------------------------
+  release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    # Needs write permission to create releases and upload assets
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      - name: Run unit tests
+        run: ./gradlew test --stacktrace
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Build release APK (unsigned)
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Rename APKs with version tag
+        run: |
+          VERSION="${{ github.ref_name }}"
+          cp app/build/outputs/apk/debug/app-debug.apk   "Mirror-${VERSION}-debug.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "Mirror-${VERSION}-release-unsigned.apk"
+
+      - name: Create GitHub Release and upload APKs
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "Mirror ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-') }}   # tags like v1.0.0-beta are pre-releases
+          generate_release_notes: true
+          files: |
+            Mirror-${{ github.ref_name }}-debug.apk
+            Mirror-${{ github.ref_name }}-release-unsigned.apk

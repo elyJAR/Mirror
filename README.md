@@ -160,9 +160,29 @@ Mirror/
 
 ---
 
+## Releases
+
+APKs are published automatically to [GitHub Releases](https://github.com/elyJAR/Mirror/releases) whenever a version tag is pushed.
+
+To cut a release:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The release job will:
+1. Run all unit tests
+2. Build a debug APK and an unsigned release APK
+3. Create a GitHub Release named `Mirror v1.0.0` with both APKs attached and auto-generated release notes
+
+Tags containing a hyphen (e.g. `v1.0.0-beta`) are published as pre-releases.
+
+---
+
 ## Status
 
-Active development — CI builds and unit tests run automatically on every push. See the badge at the top for current build status.
+Active development — CI builds and unit tests run automatically on every push to `main`. See the badge at the top for current build status.
 
 ---
 
