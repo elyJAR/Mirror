@@ -79,6 +79,9 @@ private class MiracastTransportSession(
     private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val videoSink = Channel<NalUnit>(capacity = 30)
+    override val audioSink = Channel<ByteArray>(capacity = 60)
+    override val negotiatedCodec: String = "video/avc"
+    override val stats: Flow<com.antigravity.mirror.stream.api.SessionStats> = emptyFlow()
 
     private val _events = MutableSharedFlow<TransportEvent>()
     override val events: Flow<TransportEvent> = _events.asSharedFlow()
@@ -128,6 +131,10 @@ private class MiracastTransportSession(
         }
     }
 
+    override fun submitPin(pin: String) {
+        // Miracast uses WPS/PBC, not application-layer PINs
+    }
+
     override suspend fun close(reason: String) {
         Log.i(TAG, "Closing Miracast session: $reason")
         withContext(Dispatchers.IO) {
@@ -139,8 +146,9 @@ private class MiracastTransportSession(
             runCatching { rtpSender.close() }
             runCatching { rtspServer.stop() }
             
-            // Close the sink to notify any pending senders
+            // Close the sinks to notify any pending senders
             videoSink.close()
+            audioSink.close()
         }
     }
 }

@@ -5,6 +5,7 @@ import android.util.Log
 import com.antigravity.mirror.stream.api.MirrorError
 import com.antigravity.mirror.stream.api.SessionStats
 import com.antigravity.mirror.stream.media.NalUnit
+import com.antigravity.mirror.stream.transport.TransportEvent
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.*

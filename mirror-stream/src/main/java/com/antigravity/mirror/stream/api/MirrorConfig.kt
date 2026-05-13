@@ -13,7 +13,7 @@ package com.antigravity.mirror.stream.api
  * @property fps      target frame rate.
  * @property bitrateBps target encoder bitrate in bits per second.
  * @property codec    video codec; only [Codec.H264_BASELINE] is supported in v1.
- * @property transport which network transport to use; see [Transport].
+ * @property transport which network transport to use; see [TransportPreference].
  */
 data class MirrorConfig(
     val width: Int = 1280,
@@ -21,7 +21,7 @@ data class MirrorConfig(
     val fps: Int = 30,
     val bitrateBps: Int = 4_000_000,
     val codec: Codec = Codec.H264_BASELINE,
-    val transport: Transport = Transport.AUTO,
+    val transport: TransportPreference = TransportPreference.AUTO,
 )
 
 /** Supported video codecs. v1 is H.264 Baseline only; H.265/AV1 are deferred. */
@@ -40,7 +40,7 @@ enum class Codec {
  *
  * See `docs/lan-mirror/design.md` §6 for the auto-selection decision table.
  */
-enum class Transport {
+enum class TransportPreference {
     AUTO,
     LAN,
     MIRACAST,

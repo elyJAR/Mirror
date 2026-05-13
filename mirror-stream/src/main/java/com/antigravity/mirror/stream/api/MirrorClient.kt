@@ -9,7 +9,11 @@ import com.antigravity.mirror.stream.media.ScreenCaptureEngine
 import com.antigravity.mirror.stream.media.VideoEncoder
 import com.antigravity.mirror.stream.media.AudioEncoder
 import com.antigravity.mirror.stream.selector.TransportSelector
-import com.antigravity.mirror.stream.transport.*
+import com.antigravity.mirror.stream.transport.Transport
+import com.antigravity.mirror.stream.transport.TransportId
+import com.antigravity.mirror.stream.transport.TransportTarget
+import com.antigravity.mirror.stream.transport.TransportSession
+import com.antigravity.mirror.stream.transport.TransportEvent
 import com.antigravity.mirror.stream.transport.lan.LanTransport
 import com.antigravity.mirror.stream.transport.miracast.MiracastTransport
 import kotlinx.coroutines.*
@@ -92,7 +96,7 @@ class MirrorClient(context: Context) {
                             name = target.name,
                             host = target.host,
                             port = target.port,
-                            transport = if (target.transportId == TransportId.MIRACAST) Transport.MIRACAST else Transport.LAN
+                            transportId = target.transportId
                         )
                         receiver to target
                     }
@@ -100,11 +104,11 @@ class MirrorClient(context: Context) {
             }
 
             combine(discoveryFlows) { lists ->
-                lists.flatMap { it }
-            }.collect { pairs ->
+                lists.flatMap { it.toList() }.toMap()
+            }.collect { targetsMap ->
                 discoveredTargets.clear()
-                pairs.forEach { (receiver, target) -> discoveredTargets[receiver] = target }
-                _state.value = MirrorState.ReceiversFound(pairs.map { it.first })
+                discoveredTargets.putAll(targetsMap)
+                _state.value = MirrorState.ReceiversFound(targetsMap.keys.toList())
             }
         }
     }
