@@ -42,22 +42,27 @@ class ProtocolIntegrationTest {
         val clientJob = async(Dispatchers.IO) {
             client.connect()
             
+            // Subscribe to all expected events BEFORE triggering them to avoid missing them
+            val keyframeEventDeferred = async { client.events.first { it is RequestKeyframeMessage } }
+            val byeEventDeferred = async { client.events.first { it is ByeMessage } }
+            
             // Send synthetic NAL unit
             client.sendVideo(NalUnit(byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte()), 12345L))
             
-            // Wait for keyframe request from receiver
-            val event = client.events.first { it is RequestKeyframeMessage }
+            val event = keyframeEventDeferred.await()
             event shouldBe RequestKeyframeMessage()
             
             // Wait for disconnect
-            client.events.first { it is ByeMessage }
+            byeEventDeferred.await()
         }
 
-        withTimeout(5000) {
-            clientJob.await()
-            receiverJob.await()
+        try {
+            withTimeout(5000) {
+                clientJob.await()
+                receiverJob.await()
+            }
+        } finally {
+            client.close()
         }
-        
-        client.close()
     }
 }
