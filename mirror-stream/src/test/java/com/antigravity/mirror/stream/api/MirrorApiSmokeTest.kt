@@ -3,6 +3,7 @@ package com.antigravity.mirror.stream.api
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
+import com.antigravity.mirror.stream.transport.TransportId
 
 /**
  * Phase 1 smoke test for the public `mirror-stream` API surface.
