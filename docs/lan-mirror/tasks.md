@@ -15,23 +15,19 @@ Where requirements (`Rx.x`) and design (`Dx`) IDs are referenced, they map to se
 
 ---
 
-## Phase 0 — Demolition & repo prep
+## Phase 0 — Repo prep (no code deletion)
 
-The previous Miracast/WFD attempt left a lot of code that no longer applies. Clear the decks first.
+Preserve everything that exists today. The Miracast pipeline stays — it'll work on devices where the OEM allows it, and become one of two transports behind the same `MirrorClient` API.
 
-- [ ] **0.1 (A)** Delete the Miracast/WFD code paths from `app/src/main/java/com/antigravity/mirror/`:
-  - `discovery/DiscoveryManager.kt` (Wi-Fi Direct version)
-  - `protocol/RtspServer.kt`, `RtspParser.kt`, `WfdSessionManager.kt`, `WfdNegotiator.kt`, `RtpSender.kt`
-  - `model/RtspMessage.kt`, `WfdCapabilities.kt`
-  - matching test files in `app/src/test/`
-  - `service/ConnectionTypeSelector.kt` (will be replaced by simpler interface picker)
-- [ ] **0.2 (A)** Keep `media/ScreenCaptureEngine.kt` and `media/VideoEncoder.kt` — they're transport-agnostic and reused.
-- [ ] **0.3 (A)** Keep `error/AppError.kt` as a starting point; it'll be renamed and trimmed in Phase 1.
-- [ ] **0.4 (D)** Update `README.md` to point to the LAN approach as the active path; keep a note that the Miracast attempt lives in commit history for reference.
-- [ ] **0.5 (D)** Add `.kiro/` continues to be gitignored; new docs at `docs/lan-mirror/` are committed.
-- [ ] **0.6 (D)** Tag the current `main` as `v0.1-miracast-archive` before any deletions, so the work isn't lost.
+- [ ] **0.1 (A)** Keep all existing code in `app/src/main/java/com/antigravity/mirror/{media,protocol,discovery,service,model,error}` — nothing is deleted in this phase.
+- [ ] **0.2 (D)** Tag current `main` as `v0.1-miracast-only` so the pre-pivot snapshot is easy to recover.
+- [ ] **0.3 (D)** Update `README.md`:
+  - Lead with the dual-transport story.
+  - Document that Miracast works on a subset of devices (mostly older or non-Samsung) and LAN works everywhere.
+  - Link to `docs/lan-mirror/` for the LAN spec, and keep `.kiro/specs/android-screen-mirror/` (gitignored) as the Miracast spec.
+- [ ] **0.4 (D)** `.kiro/` continues to be gitignored; new docs at `docs/lan-mirror/` are committed.
 
-**Phase 0 done when:** `./gradlew :app:assembleDebug` still compiles after deletions; CI is green; old Miracast code is gone but tagged.
+**Phase 0 done when:** repo is tagged, README reflects the dual-transport plan, no code has been moved yet.
 
 ---
 
@@ -47,25 +43,54 @@ Goal: a new Gradle module with the public API stubbed, no networking yet, no str
   - `Receiver.kt` (data class)
   - `MirrorError.kt` (sealed Exception hierarchy, see `design.md` §9)
   - `MirrorClient.kt` — class with all public methods stubbed `TODO()`, exposing `state: StateFlow<MirrorState>`.
-- [ ] **1.4 (A)** Move `ScreenCaptureEngine` and `VideoEncoder` into `mirror-stream/.../media/`. Update imports in `app/`.
-- [ ] **1.5 (A)** Add a smoke unit test that constructs `MirrorClient` with a mocked `Context` and asserts initial state is `Idle`.
-- [ ] **1.6 (D)** Update `.github/workflows/android.yml` so the CI build runs `:mirror-stream:assembleDebug` and `:mirror-stream:test` in addition to `:app`.
+- [ ] **1.4 (A)** Move `media/ScreenCaptureEngine.kt` and `media/VideoEncoder.kt` into `mirror-stream/.../media/`. Update imports in `app/`. Tests follow.
+- [ ] **1.5 (A)** Move the entire existing Miracast pipeline into `mirror-stream/.../transport/miracast/` **without changing behaviour**:
+  - `discovery/DiscoveryManager.kt`
+  - `protocol/RtspServer.kt`, `RtspParser.kt`, `WfdSessionManager.kt`, `WfdNegotiator.kt`, `RtpSender.kt`
+  - `model/RtspMessage.kt`, `WfdCapabilities.kt`
+  - matching tests in `app/src/test/` move to `mirror-stream/src/test/`
+  - existing `MirrorService` orchestration logic is **temporarily** kept in `app/` until Phase 2 — it will be split between transport-agnostic session code (moves to `stream/session/`) and the Miracast-specific `WfdSessionManager` (already in `transport/miracast/`).
+- [ ] **1.6 (A)** Add a smoke unit test that constructs `MirrorClient` with a mocked `Context` and asserts initial state is `Idle`.
+- [ ] **1.7 (D)** Update `.github/workflows/android.yml` so the CI build runs `:mirror-stream:assembleDebug` and `:mirror-stream:test` in addition to `:app`.
 
-**Phase 1 done when:** CI compiles both modules and the smoke test passes. No real functionality yet.
+**Phase 1 done when:** CI compiles both modules; existing Miracast tests still pass after the move; smoke test on the new `MirrorClient` passes. No public-API behaviour change yet.
 
 ---
 
-## Phase 2 — Wire protocol library (Android side, with a fake PC)
+## Phase 1.5 — Transport abstraction
 
-Goal: implement the full protocol on Android against a mock receiver running locally as a JVM unit-test fixture. No real PC code yet.
+Goal: introduce the `Transport` interface and adapt the existing Miracast code to implement it, without breaking the standalone app. After this phase, Miracast still works exactly as it did, but is reachable through `MirrorClient` instead of `MirrorService` directly.
 
-- [ ] **2.1 (A)** Add Kotlin `kotlinx.serialization` dependency. Create `protocol/ControlMessage.kt` modelling every JSON message from `design.md` §3.2 as a `@Serializable` sealed class.
-- [ ] **2.2 (A)** Create `protocol/Framing.kt`:
+- [ ] **1.5.1 (A)** Define `transport/Transport.kt`, `TransportSession.kt`, `TransportTarget.kt`, `TransportEvent.kt`, `TransportId.kt` per `design.md` §5.1.
+- [ ] **1.5.2 (A)** Wrap the existing Miracast pipeline in `transport/miracast/MiracastTransport.kt` (implements `Transport`):
+  - `startDiscovery()` → wraps existing `DiscoveryManager.discoverPeers()`.
+  - `connect(target, config)` → wraps existing `WfdSessionManager` orchestration.
+  - Maps existing `WifiP2pManager` reason codes into `MirrorError`.
+- [ ] **1.5.3 (A)** Stub `transport/lan/LanTransport.kt` (returns empty discovery and throws `NotImplementedError` on `connect()`). Implementation lands in Phase 2.
+- [ ] **1.5.4 (A)** Build `selector/TransportSelector.kt` per `design.md` §6:
+  - Reads/writes per-device fingerprint state via DataStore.
+  - Returns the chosen `Transport` for an `AUTO` request.
+  - Records outcomes after each session attempt.
+- [ ] **1.5.5 (A)** Wire `MirrorClient` to use `TransportSelector` + the chosen `Transport`. Public API surface unchanged.
+- [ ] **1.5.6 (A)** Refactor the standalone `app/`'s `MainActivity` to call into `MirrorClient` instead of `MirrorService` directly. The existing `MirrorService` becomes a thin foreground-service host owning a `MirrorClient`.
+- [ ] **1.5.7 (A)** Manual smoke test: a Pixel device (Miracast-allowed) still connects to Windows Connect via the new path. A Samsung device's allow-list entry is auto-set to `DENIED` after one failed Miracast attempt; subsequent runs skip Miracast immediately.
+- [ ] **1.5.8 (A)** Unit tests for `TransportSelector` decision table (§6.1) using fake `Build` values.
+
+**Phase 1.5 done when:** standalone app behaves identically to before for Miracast users; Samsung-class devices auto-fall-back-fast to LAN (which is still a stub); allow-list state persists across restarts.
+
+---
+
+## Phase 2 — LAN wire protocol (Android side, with a fake PC)
+
+Goal: implement the LAN transport's protocol on Android against a mock receiver running locally as a JVM unit-test fixture. No real PC code yet.
+
+- [ ] **2.1 (A)** Add Kotlin `kotlinx.serialization` dependency. Create `transport/lan/protocol/ControlMessage.kt` modelling every JSON message from `design.md` §3.2 as a `@Serializable` sealed class.
+- [ ] **2.2 (A)** Create `transport/lan/protocol/Framing.kt`:
   - `suspend fun ByteWriteChannel.writeFrame(tag: Byte, payload: ByteArray)`
   - `suspend fun ByteReadChannel.readFrame(): Frame` — returns `Frame(tag, payload)`
   - Hard-fails on payload > 8 MiB.
   - Uses `java.nio` for big-endian length.
-- [ ] **2.3 (A)** Create `protocol/ProtocolClient.kt`:
+- [ ] **2.3 (A)** Create `transport/lan/protocol/ProtocolClient.kt`:
   - Constructor takes `host: String`, `port: Int`.
   - `suspend fun connect(): Unit` — opens socket, performs handshake, returns when in STREAMING state.
   - `fun videoFrames(): SendChannel<NalUnit>` — encoder pushes here.
@@ -73,16 +98,17 @@ Goal: implement the full protocol on Android against a mock receiver running loc
   - Emits state into a passed-in `MutableStateFlow<MirrorState>`.
 - [ ] **2.4 (A)** Implement `request-keyframe` handling — calls into a callback that the encoder layer subscribes to.
 - [ ] **2.5 (A)** Implement clean teardown: `bye` sent, socket drained, scope cancelled. No leaked threads under JUnit.
-- [ ] **2.6 (A)** Build a test fixture `FakeReceiver.kt` (test-only) that opens a `ServerSocket` on a free port, accepts one connection, and exposes hooks (`expectHello()`, `sendHelloAck(...)`, `expectVideoFrames(n)`, `requestKeyframe()`, `closeNormally()`, `crashHard()`).
-- [ ] **2.7 (A)** Property-based tests with Kotest covering:
+- [ ] **2.6 (A)** Replace the Phase 1.5 stub: `LanTransport` now wires `ProtocolClient` to `TransportSession`, exposes `videoSink`, and forwards events. `MirrorClient` end-to-end works for the LAN path.
+- [ ] **2.7 (A)** Build a test fixture `FakeReceiver.kt` (test-only) that opens a `ServerSocket` on a free port, accepts one connection, and exposes hooks (`expectHello()`, `sendHelloAck(...)`, `expectVideoFrames(n)`, `requestKeyframe()`, `closeNormally()`, `crashHard()`).
+- [ ] **2.8 (A)** Property-based tests with Kotest covering:
   - Round-trip of every control message type.
   - Framing of payloads of varying sizes (1 B, 1 KiB, 1 MiB, 8 MiB).
   - Reject payload > 8 MiB.
   - Watchdog fires on no-pong for 15 s (use a virtual time test dispatcher).
   - Reconnect logic: 3 attempts, 1/2/4 s backoff, then `Error` with `ProjectionLost`.
-- [ ] **2.8 (A)** Connect the encoder's NAL output to `ProtocolClient.videoFrames()`. End-to-end JVM test: spin up `FakeReceiver`, drive the protocol with synthetic NAL units, assert all are received.
+- [ ] **2.9 (A)** Connect the encoder's NAL output to `LanTransport`'s `videoSink`. End-to-end JVM test: spin up `FakeReceiver`, drive the LAN protocol with synthetic NAL units, assert all are received.
 
-**Phase 2 done when:** Android-side protocol passes its unit/property tests against a local fake receiver. No real device or PC needed yet.
+**Phase 2 done when:** Android-side LAN protocol passes its unit/property tests against a local fake receiver. Both `MIRACAST` and `LAN` transports are now functional via `MirrorClient`. No real PC needed yet.
 
 ---
 
@@ -143,8 +169,11 @@ Goal: the user-facing app on the phone polished for v1 release.
 - [ ] **5.5 (A)** Streaming screen: live preview thumbnail (off-screen `SurfaceView` mirroring the encoder's source), "Disconnect" button, FPS/kbps HUD toggleable.
 - [ ] **5.6 (A)** Foreground service notification: title, receiver name, Stop action; survives Activity death.
 - [ ] **5.7 (A)** Robust error UI: dialogs for `NetworkUnreachable`, `HandshakeFailed`, `ProjectionDenied`, etc. Recoverable errors get a "Retry" button.
-- [ ] **5.8 (A)** Update `AndroidManifest.xml` permissions to drop everything Miracast-related: remove `NEARBY_WIFI_DEVICES`, `ACCESS_FINE_LOCATION`, `ACCESS_COARSE_LOCATION`, `CHANGE_WIFI_STATE`. Keep `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION`, `POST_NOTIFICATIONS`, `WAKE_LOCK`.
-- [ ] **5.9 (A)** Update app icon and `app_name` if rebranding ("Mirror Lan" vs "Mirror" — your call).
+- [ ] **5.8 (A)** `AndroidManifest.xml` permissions stay broadly the same (Miracast permissions remain because Miracast is still a supported transport). Audit:
+  - Keep: `INTERNET`, `FOREGROUND_SERVICE`, `FOREGROUND_SERVICE_MEDIA_PROJECTION`, `POST_NOTIFICATIONS`, `WAKE_LOCK`, `ACCESS_NETWORK_STATE`, `ACCESS_WIFI_STATE`, `CHANGE_WIFI_STATE`, `CHANGE_NETWORK_STATE`, `NEARBY_WIFI_DEVICES` (Miracast), `ACCESS_FINE_LOCATION` (legacy Miracast on API 23–30).
+  - The runtime-permission flow already requests `NEARBY_WIFI_DEVICES` / location only when the user picks a Miracast-eligible session. LAN-only sessions never trigger those prompts.
+- [ ] **5.9 (A)** Add a transport selector to the Settings screen: `Auto` (default) | `Miracast only` | `LAN only`, plus a "Reset Miracast detection" button (§6.3 of design.md).
+- [ ] **5.10 (A)** Update app icon and `app_name` if rebranding ("Mirror Lan" vs "Mirror" — your call).
 
 **Phase 5 done when:** A1, A2, A3, A5, A6, A7 from `requirements.md` §5 pass manually on the test device.
 

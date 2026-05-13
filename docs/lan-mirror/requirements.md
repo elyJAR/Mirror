@@ -1,10 +1,16 @@
 # LAN Screen Mirror — Requirements
 
-**Status:** Draft v1 — supersedes the Miracast/WFD path (`.kiro/specs/android-screen-mirror/`) which was blocked by Samsung's third-party Miracast lockdown.
+**Status:** Draft v1 — **complements** the existing Miracast/WFD path (`.kiro/specs/android-screen-mirror/`), it does not replace it.
 
-**Purpose:** Mirror an Android phone's screen to a PC over a local IP network using a custom protocol — not Miracast. The Android side captures and encodes the screen; the PC side runs a small receiver app that decodes and renders it.
+**Purpose:** Mirror an Android phone's screen to a PC over a local IP network using a custom protocol. The Android side captures and encodes the screen; the PC side runs a small receiver app that decodes and renders it.
 
-**Why pivot:** Modern Samsung (and most OEM) firmware blocks third-party apps from initiating Miracast via `WifiP2pManager.connect()` because it requires the `setMiracastMode()` system API. We sidestep this by not using Miracast at all — phone and PC just need IP reachability.
+**Why a second transport:** Modern Samsung (and most current OEM) firmware blocks third-party apps from initiating Miracast via `WifiP2pManager.connect()` because it requires the `setMiracastMode()` system API. The Miracast path still works on:
+
+- Older Android versions (typically pre-Android-13 from non-locked-down OEMs).
+- Some Pixel / AOSP / LineageOS builds.
+- Devices where the user can grant the app system-app status (rare).
+
+The LAN path works on **every** Android 7+ device because it only needs `INTERNET`. So the app offers both: it tries Miracast first when the user picks *"Wireless Display / Connect app"*, and offers the LAN path (with a custom PC receiver) as a universal fallback. The user can also pick the LAN path explicitly.
 
 ---
 
@@ -13,7 +19,10 @@
 ### 1.1 In scope (v1)
 
 - Real-time mirror of the phone's screen to the PC (video only).
-- Three transport modes, all using IP:
+- **Dual transport** with automatic fallback:
+  - **Miracast** — existing path, target is the Windows *Connect* app or any Miracast sink. Used opportunistically on devices where it actually works.
+  - **LAN** — new path documented in this spec, target is a custom PC receiver. Always available.
+- Three IP-network modes for the LAN transport:
   - Same Wi-Fi network (phone and PC on the same router).
   - Phone hotspot (PC connects to phone's tethering AP).
   - PC hotspot (phone connects to PC's hosted network / mobile hotspot).
@@ -40,6 +49,18 @@ This spec is written so both shapes are first-class:
 2. **Embedded Mirror module** — the Android `mirror-stream` module integrated into another Android app (the user's other GitHub project), and the receiver protocol implemented inside that other project's existing PC client.
 
 The Android library API and the wire protocol are designed to be stable and embeddable. UI in the standalone app is a thin shell over the same library.
+
+---
+
+### 1.4 Transport selection model
+
+The phone offers the user a single *"Connect"* action. Behind it, the app:
+
+1. If a Miracast sink is discovered AND the device is known to support third-party Miracast init (allow-list, see §3.7), tries Miracast first.
+2. If Miracast fails or isn't applicable, transparently falls back to LAN discovery.
+3. The user can also explicitly pick *"PC receiver (LAN)"* or *"Wireless Display (Miracast)"* from a settings menu, bypassing automatic selection.
+
+For the integrator embedding `mirror-stream` into another app, the transport choice is exposed as `MirrorConfig.transport` and defaults to `Transport.AUTO`.
 
 ---
 
@@ -73,7 +94,15 @@ The Android library API and the wire protocol are designed to be stable and embe
 
 ## 3. Functional requirements
 
-### 3.1 Discovery
+### 3.0 Transport selection
+
+- **F0.1** App MUST present a single primary *Connect* action. Auto-selection logic from §1.4 picks the transport.
+- **F0.2** App MUST expose a settings toggle: `Auto | Miracast only | LAN only`.
+- **F0.3** When auto-selecting, the app MUST attempt Miracast first only if the device is in the Miracast allow-list (§3.7). Otherwise it skips straight to LAN.
+- **F0.4** When Miracast fails after `connect()` returns dropped/error within 5 s, app MUST automatically fall back to LAN discovery without requiring a second user tap.
+- **F0.5** App MUST log which transport succeeded so users can report patterns.
+
+### 3.1 Discovery (LAN)
 
 - **F1.1** PC receiver MUST advertise itself via mDNS using service type `_mirror-stream._tcp.local.` and TXT records for protocol version and capabilities.
 - **F1.2** Phone MUST scan for `_mirror-stream._tcp.local.` services on all reachable network interfaces (Wi-Fi, mobile hotspot, USB tether).
@@ -116,6 +145,12 @@ The Android library API and the wire protocol are designed to be stable and embe
 - **F6.2** Phone MUST allow the user to set a target resolution capped at the device's native (presets: 720p, 1080p, native).
 - **F6.3** PC MUST persist last-used window size and position.
 - **F6.4** Settings MUST persist across app restarts (Android `SharedPreferences`, PC application config file).
+
+### 3.7 Miracast allow-list
+
+- **F7.1** App MUST maintain a runtime allow-list of `(manufacturer, sdkInt)` patterns where Miracast is known to work. Built-in defaults: API ≤ 30 + non-Samsung; Pixel devices on stock AOSP; explicit user override.
+- **F7.2** App MUST detect Miracast failure modes (synchronous `Dropping connect request` log, immediate `onFailure(reason=0)`, no broadcast within 5 s) and demote that device's allow-list entry to `denied` for future sessions, persisted across restarts.
+- **F7.3** App MUST expose a *"Reset Miracast detection"* button in advanced settings.
 
 ---
 
