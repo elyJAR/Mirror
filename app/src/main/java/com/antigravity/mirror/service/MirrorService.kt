@@ -258,6 +258,13 @@ class MirrorService : Service() {
         val connectionType = detectAndNotifyConnectionType() ?: return
 
         Log.i(TAG, "connectToDevice: ${device.deviceName}, connectionType=$connectionType")
+
+        // Cancel discovery job first — the DiscoveryManager will also call stopPeerDiscovery
+        // internally before connect(), but cancelling the job ensures the flow is torn down
+        // cleanly and no stale PeersFound events arrive after we start connecting.
+        discoveryJob?.cancel()
+        discoveryJob = null
+
         _state.value = MirrorState.Connecting
 
         connectionJob?.cancel()
