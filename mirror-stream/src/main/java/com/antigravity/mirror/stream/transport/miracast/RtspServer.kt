@@ -146,8 +146,13 @@ class RtspServer(private val port: Int = 7236) {
 
         // Read the request line and headers until the blank line.
         var contentLength = 0
-        while (true) {
-            val line = reader.readLine() ?: return null // EOF
+        var lineCount = 0
+        val MAX_HEADERS = 100
+        val MAX_LINE_LENGTH = 4096
+
+        while (lineCount < MAX_HEADERS) {
+            val line = readLimitedLine(reader, MAX_LINE_LENGTH) ?: return null // EOF
+            lineCount++
             sb.append(line).append("\r\n")
             if (line.isEmpty()) {
                 // Blank line — end of headers.
@@ -159,7 +164,19 @@ class RtspServer(private val port: Int = 7236) {
             }
         }
 
+        if (lineCount >= MAX_HEADERS) {
+            Log.w(TAG, "Too many headers in RTSP message")
+            return null
+        }
+
         // Read the body if Content-Length > 0.
+        // Limit body size to 64KB to prevent OOM
+        val MAX_BODY_SIZE = 64 * 1024
+        if (contentLength > MAX_BODY_SIZE) {
+            Log.w(TAG, "RTSP body too large: $contentLength")
+            return null
+        }
+
         if (contentLength > 0) {
             val bodyChars = CharArray(contentLength)
             var totalRead = 0
@@ -171,6 +188,32 @@ class RtspServer(private val port: Int = 7236) {
             sb.append(bodyChars, 0, totalRead)
         }
 
+        return sb.toString()
+    }
+
+    /**
+     * Reads a line from [reader] with a maximum length to prevent DoS.
+     */
+    private fun readLimitedLine(reader: BufferedReader, maxLength: Int): String? {
+        val sb = StringBuilder()
+        var charCount = 0
+        while (charCount < maxLength) {
+            val c = reader.read()
+            if (c == -1) return if (sb.isEmpty()) null else sb.toString()
+            if (c == '\n'.toInt()) break
+            if (c == '\r'.toInt()) {
+                reader.mark(1)
+                if (reader.read() != '\n'.toInt()) {
+                    reader.reset()
+                }
+                break
+            }
+            sb.append(c.toChar())
+            charCount++
+        }
+        if (charCount >= maxLength) {
+            Log.w(TAG, "RTSP line too long")
+        }
         return sb.toString()
     }
 

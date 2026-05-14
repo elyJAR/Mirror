@@ -75,6 +75,18 @@ function startNetworkServices(window: BrowserWindow) {
     window.webContents.send('pairing-pin', currentPin);
     
     let buffer = Buffer.alloc(0);
+    let pinAttempts = 0;
+    const MAX_PIN_ATTEMPTS = 3;
+
+    // Remove any existing handler to avoid collision
+    ipcMain.removeHandler('send-control');
+    
+    // Handle outgoing control messages from renderer
+    ipcMain.handle('send-control', async (_event, msg) => {
+      if (!socket.destroyed) {
+        sendControl(socket, msg);
+      }
+    });
     
     socket.on('data', (data) => {
       // Accumulate data into buffer
@@ -97,7 +109,16 @@ function startNetworkServices(window: BrowserWindow) {
         const payload = buffer.subarray(5, 5 + length);
         buffer = buffer.slice(5 + length);
         
-        handleFrame(tag, payload, socket, window);
+        const shouldContinue = handleFrame(tag, payload, socket, window, () => {
+          pinAttempts++;
+          return pinAttempts >= MAX_PIN_ATTEMPTS;
+        });
+
+        if (!shouldContinue) {
+          console.warn('Too many PIN attempts, disconnecting');
+          socket.destroy();
+          return;
+        }
       }
     });
 
@@ -149,30 +170,25 @@ function startNetworkServices(window: BrowserWindow) {
   }
 }
 
-function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: BrowserWindow) {
+function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: BrowserWindow, onPinFailure: () => boolean): boolean {
   if (tag === 0x01) { // Control Message (JSON)
     try {
       const raw = payload.toString();
       const msg = JSON.parse(raw);
+      // ... (inferredType logic remains the same)
       const inferredType =
         typeof msg.type === 'string'
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
-      console.log('Received control message raw:', raw);
-      console.log('Received control message type:', msg.type);
-      console.log('Received control message keys:', Object.keys(msg));
-      if (inferredType !== msg.type) {
-        console.log('Inferred control message type:', inferredType);
-      }
+      
       window.webContents.send('control-message', msg);
       
       // Automatic handshake response
       if (inferredType === 'hello') {
+        // ... (hello-ack logic)
         const supportedCodecs = msg.codecs || ['video/avc'];
         const chosenCodec = supportedCodecs.includes('video/hevc') ? 'video/hevc' : 'video/avc';
 
-        console.log('Sending hello-ack with PIN required');
-        
         sendControl(socket, {
           type: 'hello-ack',
           receiver: 'Mirror PC',
@@ -180,9 +196,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           pinRequired: true
         });
       } else if (inferredType === 'verify-pin') {
-        console.log('Received verify-pin');
         const isMatch = msg.pin === currentPin;
-        console.log('PIN match:', isMatch);
         sendControl(socket, {
           type: 'auth-result',
           success: isMatch,
@@ -190,11 +204,13 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         });
         
         if (isMatch) {
-          console.log('PIN verified successfully');
           window.webContents.send('pairing-success');
+        } else {
+          if (onPinFailure()) {
+            return false; // Signal to disconnect
+          }
         }
       } else if (inferredType === 'ping') {
-        // Respond to ping with pong to keep connection alive
         sendControl(socket, {
           type: 'pong',
           timestamp: msg.timestamp
@@ -204,12 +220,11 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
       console.error('Failed to parse control message:', e);
     }
   } else if (tag === 0x02) { // Video NAL Unit
-    // Forward raw bytes to renderer for WebCodecs
     window.webContents.send('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
-    // Forward raw bytes to renderer for Audio context/decoder
     window.webContents.send('audio-frame', payload);
   }
+  return true;
 }
 
 function sendControl(socket: net.Socket, msg: any) {

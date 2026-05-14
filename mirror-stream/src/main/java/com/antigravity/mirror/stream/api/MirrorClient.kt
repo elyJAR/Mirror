@@ -254,6 +254,7 @@ class MirrorClient(context: Context) {
         Log.i(TAG, "Projection granted, starting media pipeline")
 
             try {
+                Log.d(TAG, "Creating VideoEncoder with codec=${session.negotiatedCodec} width=${config.width} height=${config.height}")
                 val encoder = VideoEncoder(
                     width = config.width,
                     height = config.height,
@@ -261,25 +262,37 @@ class MirrorClient(context: Context) {
                     frameRate = config.fps,
                     mimeType = session.negotiatedCodec
                 )
+                Log.d(TAG, "VideoEncoder created successfully")
+                
+                Log.d(TAG, "Creating ScreenCaptureEngine")
                 val capture = ScreenCaptureEngine(projection, encoder)
+                Log.d(TAG, "ScreenCaptureEngine created successfully")
             
                 // Wire the pipeline: Encoder -> TransportSession
+                Log.d(TAG, "Setting NAL unit callback")
                 capture.setNalUnitCallback { bytes, ts ->
                     session.videoSink.trySend(NalUnit(bytes, ts))
                 }
+                Log.d(TAG, "NAL unit callback set")
             
                 videoEncoder = encoder
                 captureEngine = capture
             
                 // Start audio capture (Android 10+)
+                Log.d(TAG, "Creating AudioEncoder")
                 audioEncoder = AudioEncoder(projection).apply {
+                    Log.d(TAG, "Starting AudioEncoder")
                     start { data, pts ->
                         session.audioSink.trySend(data)
                     }
+                    Log.d(TAG, "AudioEncoder started")
                 }
             
                 // Default to 160 DPI
+                Log.d(TAG, "Starting screen capture with DPI=160")
                 capture.start(config.width, config.height, 160)
+                Log.d(TAG, "Screen capture started successfully")
+                Log.i(TAG, "Media pipeline initialized, transitioning to Streaming state")
                 _state.value = MirrorState.Streaming
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize media pipeline: ${e.message}", e)
