@@ -193,6 +193,12 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           console.log('PIN verified successfully');
           window.webContents.send('pairing-success');
         }
+      } else if (inferredType === 'ping') {
+        // Respond to ping with pong to keep connection alive
+        sendControl(socket, {
+          type: 'pong',
+          timestamp: msg.timestamp
+        });
       }
     } catch (e) {
       console.error('Failed to parse control message:', e);
