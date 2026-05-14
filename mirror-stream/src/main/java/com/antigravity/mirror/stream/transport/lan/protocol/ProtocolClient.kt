@@ -9,7 +9,6 @@ import com.antigravity.mirror.stream.transport.TransportEvent
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.*
-import java.nio.channels.ClosedChannelException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
@@ -201,14 +200,15 @@ class ProtocolClient(
                     Log.w(TAG, "Received unexpected video frame from receiver")
                 }
             }
-        } catch (e: io.ktor.utils.io.ClosedChannelException) {
-            if (scope.isActive) {
-                Log.i(TAG, "Read loop: channel closed (expected during shutdown)")
-            }
         } catch (e: Exception) {
             if (scope.isActive) {
-                Log.e(TAG, "Read loop failed: ${e.message}", e)
-                runCatching { _events.emit(ByeMessage(reason = "connection-loss")) }
+                // ClosedChannelException is expected during shutdown
+                if (e::class.simpleName == "ClosedChannelException") {
+                    Log.i(TAG, "Read loop: channel closed (expected during shutdown)")
+                } else {
+                    Log.e(TAG, "Read loop failed: ${e.message}", e)
+                    runCatching { _events.emit(ByeMessage(reason = "connection-loss")) }
+                }
             }
         }
     }
@@ -243,12 +243,8 @@ class ProtocolClient(
                     bytesSent += audio.size
                 }
             }
-        } catch (e: io.ktor.utils.io.ClosedChannelException) {
-            if (scope.isActive) {
-                Log.i(TAG, "Write loop: channel closed (expected during shutdown)")
-            }
         } catch (e: Exception) {
-            if (scope.isActive) {
+            if (scope.isActive && e::class.simpleName != "ClosedChannelException") {
                 Log.e(TAG, "Write loop failed: ${e.message}", e)
             }
         }
