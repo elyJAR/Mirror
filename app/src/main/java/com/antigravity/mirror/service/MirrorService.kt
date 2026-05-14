@@ -58,6 +58,7 @@ class MirrorService : Service() {
         // Monitor state transitions
         serviceScope.launch {
             client.state.collect { state ->
+                Log.i(TAG, "Client state: ${state::class.simpleName}")
                 when (state) {
                     is MirrorState.Streaming -> promoteToForeground(isStreaming = true)
                     is MirrorState.Idle, is MirrorState.Error -> promoteToForeground(isStreaming = false)
