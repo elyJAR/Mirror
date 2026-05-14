@@ -147,9 +147,9 @@ function startNetworkServices(window: BrowserWindow) {
     }
   });
 
-  // Listen on all interfaces
-  tcpServer.listen(8765, '0.0.0.0', () => {
-    console.log('TCP Server listening on port 8765');
+  // Listen on all interfaces (IPv4 and IPv6)
+  tcpServer.listen(8765, () => {
+    console.log('TCP Server listening on port 8765 (all interfaces)');
   });
 
   // Advertise service via mDNS
