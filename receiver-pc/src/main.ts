@@ -20,6 +20,7 @@ const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
 const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 const advertisedName = `Mirror PC ${process.pid}`;
+const trustedDevices = new Set<string>();
 
 /**
  * Main application window setup.
@@ -179,16 +180,21 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
       
       // Automatic handshake response
       if (inferredType === 'hello') {
-        // ... (hello-ack logic)
         const supportedCodecs = msg.codecs || ['video/avc'];
         const chosenCodec = supportedCodecs.includes('video/hevc') ? 'video/hevc' : 'video/avc';
+        const deviceIp = socket.remoteAddress || 'unknown';
+        const isTrusted = trustedDevices.has(deviceIp);
 
         sendControl(socket, {
           type: 'hello-ack',
           receiver: 'Mirror PC',
           params: { width: 1280, height: 720, fps: 30, codec: chosenCodec },
-          pinRequired: true
+          pinRequired: !isTrusted
         });
+        
+        if (isTrusted) {
+          window.webContents.send('pairing-success');
+        }
       } else if (inferredType === 'verify-pin') {
         const isMatch = msg.pin === currentPin;
         sendControl(socket, {
@@ -198,6 +204,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         });
         
         if (isMatch) {
+          trustedDevices.add(socket.remoteAddress || 'unknown');
           window.webContents.send('pairing-success');
         } else {
           if (onPinFailure()) {
