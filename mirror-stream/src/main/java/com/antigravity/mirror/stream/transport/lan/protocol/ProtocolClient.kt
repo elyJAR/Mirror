@@ -9,7 +9,7 @@ import com.antigravity.mirror.stream.transport.TransportEvent
 import io.ktor.network.selector.*
 import io.ktor.network.sockets.*
 import io.ktor.utils.io.*
-import io.ktor.utils.io.ClosedChannelException
+import java.nio.channels.ClosedChannelException
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
