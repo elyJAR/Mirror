@@ -161,6 +161,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        val toolbar = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
+        setSupportActionBar(toolbar)
+
         // Panels
         panelHome      = findViewById(R.id.panelHome)
         panelScanning  = findViewById(R.id.panelScanning)
