@@ -392,7 +392,7 @@ class MainActivity : AppCompatActivity() {
             }
 
             is MirrorState.Streaming -> {
-                val target = state.receiver?.name ?: "PC"
+                val target = "Connected Display"
                 startStreamTimer(target)
                 showPanel(panelStreaming)
             }
