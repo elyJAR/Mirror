@@ -110,6 +110,11 @@ class MainActivity : AppCompatActivity() {
             mirrorService = localBinder.getService()
             isBound = true
             observeState()
+            
+            // Auto-discover if permissions are already granted
+            if (PermissionManager.missingPermissions(this@MainActivity).isEmpty()) {
+                mirrorService?.startDiscovery()
+            }
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -150,6 +155,8 @@ class MainActivity : AppCompatActivity() {
                 if (permanentlyDenied) {
                     showSettingsDialog()
                 }
+            } else {
+                mirrorService?.startDiscovery()
             }
         }
 

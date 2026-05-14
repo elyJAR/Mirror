@@ -31,9 +31,7 @@
             android:paddingEnd="4dp"
             app:title="MirrorStream"
             app:titleTextColor="@color/kg_text_primary"
-            app:titleTextAppearance="@style/TextAppearance.Mirror.Toolbar"
-            app:navigationIcon="@drawable/ic_menu"
-            app:navigationIconTint="@color/kg_text_secondary" />
+            app:titleTextAppearance="@style/TextAppearance.Mirror.Toolbar" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
