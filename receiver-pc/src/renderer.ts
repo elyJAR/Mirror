@@ -64,7 +64,7 @@ function initDecoder() {
 function initAudio() {
   // AudioContext can only be created once (rate-limited by browsers / Electron).
   if (!audioCtx) {
-    audioCtx = new AudioContext();
+    audioCtx = new window.AudioContext({ latencyHint: 'interactive' });
     nextAudioTime = audioCtx.currentTime;
   }
 
@@ -73,7 +73,7 @@ function initAudio() {
     audioDecoder.close();
   }
 
-  audioDecoder = new AudioDecoder({
+  audioDecoder = new window.AudioDecoder({
     output: (data) => {
       if (!audioCtx) return;
 
@@ -91,9 +91,14 @@ function initAudio() {
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
-      const startTime = Math.max(nextAudioTime, audioCtx.currentTime);
-      source.start(startTime);
-      nextAudioTime = startTime + buffer.duration;
+      const now = audioCtx.currentTime;
+      // Prevent unbounded latency: bound the playhead to within 100ms of real-time
+      if (nextAudioTime < now || nextAudioTime > now + 0.1) {
+        nextAudioTime = now + 0.05; // Force 50ms buffer
+      }
+
+      source.start(nextAudioTime);
+      nextAudioTime += buffer.duration;
 
       data.close();
     },
