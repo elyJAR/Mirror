@@ -34,6 +34,7 @@ const createWindow = () => {
     minWidth: 640,
     minHeight: 360,
     title: 'Mirror Receiver',
+    autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
