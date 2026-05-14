@@ -10,7 +10,7 @@
         <item name="colorOnSecondary">@color/kg_text_primary</item>
         <item name="colorSurface">@color/kg_bg_surface</item>
         <item name="colorOnSurface">@color/kg_text_primary</item>
-        <item name="colorBackground">@color/kg_bg_deep</item>
+        <item name="android:colorBackground">@color/kg_bg_deep</item>
         <item name="colorOnBackground">@color/kg_text_primary</item>
         <item name="colorError">@color/kg_stop</item>
         <item name="colorOnError">@color/kg_text_primary</item>
