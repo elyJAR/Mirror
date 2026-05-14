@@ -330,7 +330,7 @@ class MirrorClient(context: Context) {
 
     /** Helper to load [MirrorConfig] from app [SharedPreferences]. */
     fun loadConfigFromPrefs(prefs: android.content.SharedPreferences): MirrorConfig {
-        val bitrate = prefs.getString("bitrate", "4000000")?.toIntOrNull() ?: 4_000_000
+        val bitrate = prefs.getString("bitrate", "8000000")?.toIntOrNull() ?: 8_000_000
         val resolution = prefs.getString("resolution", "720p") ?: "720p"
         val transportMode = prefs.getString("transport_mode", "auto") ?: "auto"
         

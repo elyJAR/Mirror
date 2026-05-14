@@ -101,10 +101,9 @@ function initAudio() {
   });
 }
 
-// ...
+// Initialise audio on any user interaction (fallback / reconnect path)
 window.addEventListener('click', () => {
   initAudio();
-  statusEl.textContent = 'Audio enabled';
 });
 
 // ...
@@ -155,40 +154,58 @@ window.electronAPI.onControlMessage((msg) => {
 window.electronAPI.onVideoFrame((payload: Uint8Array) => {
   if (!decoder || decoder.state === 'closed') return;
 
-  let nalType = payload[0] & 0x1F;
-  // If it's HEVC, the type is in bits 1-6 of the first byte
-  const hevcType = (payload[0] >> 1) & 0x3F;
-  
-  // 1. Configure decoder on first SPS (AVC: 7) or VPS/SPS (HEVC: 32, 33)
-  const isAVC = nalType === 7;
+  bytesReceived += payload.length;
+
+  // Skip any leading Annex-B start code so nalOffset always points to the NAL type byte.
+  // Combined HEVC payloads (SPS+PPS+IDR) start with 0x00 0x00 0x00 0x01 which would
+  // make payload[0] look like 0x00 (not a NAL type) and break decoder configuration.
+  let nalOffset = 0;
+  if (payload.length >= 4 && payload[0] === 0 && payload[1] === 0 && payload[2] === 0 && payload[3] === 1) {
+    nalOffset = 4;
+  } else if (payload.length >= 3 && payload[0] === 0 && payload[1] === 0 && payload[2] === 1) {
+    nalOffset = 3;
+  }
+
+  const firstByte = payload[nalOffset];
+  const nalType   = firstByte & 0x1F;         // AVC 5-bit NAL type
+  const hevcType  = (firstByte >> 1) & 0x3F;  // HEVC 6-bit NAL type
+
+  // Configure decoder on first parameter-set NAL (AVC SPS=7, HEVC VPS=32, SPS=33)
+  const isAVC  = nalType  === 7;
   const isHEVC = hevcType === 32 || hevcType === 33;
 
   if (!isConfigured && (isAVC || isHEVC)) {
-    const codecStr = isHEVC ? 'hev1.1.6.L120.90' : 'avc1.42E01F';
+    // Level 5.0 (L150) matches HEVCMainTierLevel5 reported by the Android encoder
+    const codecStr = isHEVC ? 'hev1.1.6.L150.90' : 'avc1.42E01F';
     console.log(`Configuring decoder with ${codecStr}...`);
-    decoder.configure({
-      codec: codecStr,
-      optimizeForLatency: true,
-    });
+    decoder.configure({ codec: codecStr, optimizeForLatency: true });
     isConfigured = true;
   }
 
   if (!isConfigured) return;
 
-  // 2. Prepare chunk
-  // Prepend Annex-B start code because our Android encoder strips them
-  const annexB = new Uint8Array(payload.length + 4);
-  annexB.set([0, 0, 0, 1], 0);
-  annexB.set(payload, 4);
+  // Build Annex-B chunk. Don't prepend a start code if the payload already has one
+  // (combined SPS+PPS+IDR chunks already start with 0x00 0x00 0x00 0x01).
+  let annexB: Uint8Array;
+  if (nalOffset > 0) {
+    annexB = payload;
+  } else {
+    annexB = new Uint8Array(payload.length + 4);
+    annexB.set([0, 0, 0, 1], 0);
+    annexB.set(payload, 4);
+  }
 
-  // Keyframe detection:
-  // AVC: nalType 5 (IDR)
-  // HEVC: hevcType 16-21 (IDR, CRA)
-  const isKey = isHEVC ? (hevcType >= 16 && hevcType <= 21) : (nalType === 5);
+  // Mark as keyframe for IDR NAL types OR parameter-set NAL types
+  // (parameter-set types are only sent prepended to IDR frames).
+  // AVC:  IDR=5, SPS=7 (combined chunk)
+  // HEVC: IDR/CRA=16-21, VPS/SPS/PPS=32-34 (combined chunk)
+  const isKey = isHEVC
+    ? ((hevcType >= 16 && hevcType <= 21) || (hevcType >= 32 && hevcType <= 34))
+    : (nalType === 5 || nalType === 7);
 
   const chunk = new EncodedVideoChunk({
     type: isKey ? 'key' : 'delta',
-    timestamp: performance.now() * 1000, // Microseconds
+    timestamp: performance.now() * 1000,
     data: annexB,
   });
 
@@ -285,4 +302,7 @@ window.electronAPI.onPairingSuccess(() => {
   pairingEl.style.display = 'none';
   statusEl.textContent = 'Authenticated. Starting stream...';
   inputEnabled = true;
+  // Pairing success fires right after user interaction (PIN submit) — safe to
+  // initialise AudioContext here to satisfy the browser autoplay policy.
+  initAudio();
 });

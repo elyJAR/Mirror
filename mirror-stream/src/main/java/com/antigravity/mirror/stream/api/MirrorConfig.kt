@@ -19,7 +19,7 @@ data class MirrorConfig(
     val width: Int = 1280,
     val height: Int = 720,
     val fps: Int = 30,
-    val bitrateBps: Int = 4_000_000,
+    val bitrateBps: Int = 8_000_000,
     val codec: Codec = Codec.H264_BASELINE,
     val transport: TransportPreference = TransportPreference.AUTO,
 )

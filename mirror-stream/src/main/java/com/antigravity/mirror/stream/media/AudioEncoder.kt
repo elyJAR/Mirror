@@ -115,12 +115,13 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
                 // Drain MediaCodec
                 var outputIndex = codec?.dequeueOutputBuffer(bufferInfo, 0) ?: -1
                 while (outputIndex >= 0) {
-                    val outputBuffer = codec?.getOutputBuffer(outputIndex)!!
-                    val data = ByteArray(bufferInfo.size)
-                    outputBuffer.get(data)
-                    
-                    onAudioData(data, bufferInfo.presentationTimeUs)
-                    
+                    val isCodecConfig = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
+                    if (!isCodecConfig && bufferInfo.size > 0) {
+                        val outputBuffer = codec?.getOutputBuffer(outputIndex)!!
+                        val data = ByteArray(bufferInfo.size)
+                        outputBuffer.get(data)
+                        onAudioData(data, bufferInfo.presentationTimeUs)
+                    }
                     codec?.releaseOutputBuffer(outputIndex, false)
                     outputIndex = codec?.dequeueOutputBuffer(bufferInfo, 0) ?: -1
                 }
