@@ -19,7 +19,7 @@ class MirrorApiSmokeTest : StringSpec({
         cfg.width shouldBe 1280
         cfg.height shouldBe 720
         cfg.fps shouldBe 30
-        cfg.bitrateBps shouldBe 4_000_000
+        cfg.bitrateBps shouldBe 8_000_000
         cfg.codec shouldBe Codec.H264_BASELINE
         cfg.transport shouldBe TransportPreference.AUTO
     }

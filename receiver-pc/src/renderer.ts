@@ -62,43 +62,55 @@ function initDecoder() {
 }
 
 function initAudio() {
-  if (audioCtx) return;
-  audioCtx = new AudioContext();
-  nextAudioTime = audioCtx.currentTime;
-  
+  // AudioContext can only be created once (rate-limited by browsers / Electron).
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+    nextAudioTime = audioCtx.currentTime;
+  }
+
+  // Re-create AudioDecoder on every call so reconnects get a fresh decoder.
+  if (audioDecoder && audioDecoder.state !== 'closed') {
+    audioDecoder.close();
+  }
+
   audioDecoder = new AudioDecoder({
     output: (data) => {
       if (!audioCtx) return;
-      
+
       const buffer = audioCtx.createBuffer(
         data.numberOfChannels,
         data.numberOfFrames,
         data.sampleRate
       );
-      
+
       for (let i = 0; i < data.numberOfChannels; i++) {
         data.copyTo(buffer.getChannelData(i), { planeIndex: i });
       }
-      
+
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioCtx.destination);
-      
-      // Schedule playback
+
       const startTime = Math.max(nextAudioTime, audioCtx.currentTime);
       source.start(startTime);
       nextAudioTime = startTime + buffer.duration;
-      
+
       data.close();
     },
     error: (e) => console.error('AudioDecoder error:', e),
   });
-  
+
+  // AudioSpecificConfig for AAC-LC, 44100 Hz, stereo:
+  //   audioObjectType=2 (5 bits), samplingFreqIdx=4 (4 bits), channelConfig=2 (4 bits)
+  //   => 00010 0100 0010 0000 => 0x12 0x10
   audioDecoder.configure({
-    codec: 'mp4a.40.2', // AAC-LC
+    codec: 'mp4a.40.2',
     sampleRate: 44100,
     numberOfChannels: 2,
+    description: new Uint8Array([0x12, 0x10]),
   });
+
+  console.log('AudioDecoder configured (AAC-LC 44100Hz stereo)');
 }
 
 // Initialise audio on any user interaction (fallback / reconnect path)
