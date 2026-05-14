@@ -88,7 +88,22 @@ class MirrorService : Service() {
     fun connect(receiver: Receiver, config: com.antigravity.mirror.stream.api.MirrorConfig) = client.connect(receiver, config)
     fun connectManual(host: String, port: Int, config: com.antigravity.mirror.stream.api.MirrorConfig) = client.connectManual(host, port, config)
     fun loadConfigFromPrefs(prefs: android.content.SharedPreferences) = client.loadConfigFromPrefs(prefs)
-    fun onProjectionGranted(resultCode: Int, data: Intent) = client.onProjectionGranted(resultCode, data)
+    fun onProjectionGranted(resultCode: Int, data: Intent) {
+        // IMPORTANT: Update foreground service type to MEDIA_PROJECTION before creating ScreenCaptureEngine
+        // This must happen BEFORE MirrorClient attempts to create the projection
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            Log.i(TAG, "Switching foreground service to MEDIA_PROJECTION type")
+            val notification = buildNotification(isStreaming = false)
+            runCatching {
+                ServiceCompat.startForeground(this, NOTIFICATION_ID, notification, 
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+            }.onFailure { e ->
+                Log.e(TAG, "Failed to switch to MEDIA_PROJECTION service type", e)
+            }
+        }
+        
+        client.onProjectionGranted(resultCode, data)
+    }
     fun disconnect() = client.disconnect()
     fun submitPin(pin: String) = client.submitPin(pin)
     fun getState(): StateFlow<MirrorState> = client.state
