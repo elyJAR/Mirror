@@ -14,7 +14,6 @@
     <string name="btn_connect">Connect</string>
     <string name="btn_cancel">Cancel</string>
     <string name="btn_retry">Retry</string>
-    <string name="label_discovering">Searching for devices…</string>
     <string name="label_connecting">Connecting…</string>
     <string name="label_streaming">Streaming</string>
     <string name="label_no_devices">No devices found</string>
