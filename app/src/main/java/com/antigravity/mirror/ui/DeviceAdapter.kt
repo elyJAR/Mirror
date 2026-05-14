@@ -28,6 +28,7 @@ class DeviceAdapter(
     inner class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         val deviceName: TextView = itemView.findViewById(R.id.deviceName)
         val deviceAddress: TextView = itemView.findViewById(R.id.deviceAddress)
+        val connectButton: View = itemView.findViewById(R.id.connectButton)
     }
 
     // -------------------------------------------------------------------------
@@ -45,6 +46,7 @@ class DeviceAdapter(
         holder.deviceName.text = device.name.ifBlank { "Unknown Receiver" }
         holder.deviceAddress.text = "${device.host}:${device.port} (${device.transportId})"
         holder.itemView.setOnClickListener { onDeviceClick(device) }
+        holder.connectButton.setOnClickListener { onDeviceClick(device) }
     }
 
     override fun getItemCount(): Int = devices.size

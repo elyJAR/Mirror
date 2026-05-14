@@ -146,6 +146,10 @@ statusEl.textContent = 'Waiting for phone...';
 
 // --- IPC Event Handlers ---
 
+window.electronAPI.onLocalIp((ip) => {
+  statusEl.textContent = `Waiting for phone at ${ip}...`;
+});
+
 window.electronAPI.onPeerConnected((peer) => {
   peerEl.textContent = peer.address;
   statusEl.textContent = 'Connected, waiting for stream...';

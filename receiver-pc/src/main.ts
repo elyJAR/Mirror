@@ -71,6 +71,13 @@ const createWindow = () => {
   // Open the DevTools for development
   // mainWindow.webContents.openDevTools();
 
+  mainWindow.webContents.on('did-finish-load', () => {
+    const ip = getLocalIpAddress();
+    if (ip) {
+      mainWindow?.webContents.send('local-ip', `${ip}:8765`);
+    }
+  });
+
   startNetworkServices(mainWindow);
 };
 

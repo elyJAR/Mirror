@@ -22,6 +22,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPairingPin: (callback: (pin: string) => void) =>
     ipcRenderer.on('pairing-pin', (_event, value) => callback(value)),
 
+  onLocalIp: (callback: (ip: string) => void) =>
+    ipcRenderer.on('local-ip', (_event, value) => callback(value)),
+
   onPairingSuccess: (callback: () => void) =>
     ipcRenderer.on('pairing-success', (_event) => callback()),
     

@@ -341,10 +341,18 @@ class MainActivity : AppCompatActivity() {
         streamTimerTask = null
     }
 
+    private var pinDialog: AlertDialog? = null
+
     // ── state renderer ─────────────────────────────────────────────────────────
 
     private fun renderState(state: MirrorState) {
         Log.i(TAG, "Rendering state: ${state::class.simpleName}")
+        
+        if (state !is MirrorState.AwaitingPairing) {
+            pinDialog?.dismiss()
+            pinDialog = null
+        }
+
         when (state) {
 
             is MirrorState.Idle -> {
@@ -486,13 +494,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPinInputDialog() {
+        if (pinDialog?.isShowing == true) return
         Log.i(TAG, "Showing PIN input dialog")
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             hint = "0000"
         }
 
-        AlertDialog.Builder(this)
+        pinDialog = AlertDialog.Builder(this)
             .setTitle(R.string.dialog_pin_title)
             .setMessage(R.string.dialog_pin_message)
             .setView(input)
