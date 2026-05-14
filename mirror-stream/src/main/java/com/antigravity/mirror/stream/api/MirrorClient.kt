@@ -158,32 +158,27 @@ class MirrorClient(context: Context) {
                     val transport = transports[target.transportId] ?: throw IllegalStateException("Transport not found")
                     
                     Log.i(TAG, "Starting session via ${target.transportId} to ${target.name} (Attempt ${attempts + 1})")
-                    try {
-                        val session = transport.connect(target, config)
-                        activeSession = session
-                        Log.i(TAG, "transport.connect() completed successfully")
-                        
-                        // Collect stats
-                        launch {
-                            session.stats.collect { stats ->
-                                _stats.value = stats
-                                handleCongestion(stats)
-                            }
+                    val session = transport.connect(target, config)
+                    activeSession = session
+                    Log.i(TAG, "transport.connect() completed successfully")
+                    
+                    // Collect stats
+                    launch {
+                        session.stats.collect { stats ->
+                            _stats.value = stats
+                            handleCongestion(stats)
                         }
-
-                        Log.i(TAG, "Session established. pairingRequired=${session.pairingRequired}")
-                        _state.value = if (session.pairingRequired) {
-                            Log.i(TAG, "Setting state to AwaitingPairing")
-                            MirrorState.AwaitingPairing
-                        } else {
-                            Log.i(TAG, "Setting state to AwaitingProjection")
-                            MirrorState.AwaitingProjection
-                        }
-                        Log.i(TAG, "State set. Current state: ${_state.value::class.simpleName}")
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Exception during/after transport.connect(): ${e.javaClass.simpleName}: ${e.message}", e)
-                        throw e
                     }
+
+                    Log.i(TAG, "Session established. pairingRequired=${session.pairingRequired}")
+                    _state.value = if (session.pairingRequired) {
+                        Log.i(TAG, "Setting state to AwaitingPairing")
+                        MirrorState.AwaitingPairing
+                    } else {
+                        Log.i(TAG, "Setting state to AwaitingProjection")
+                        MirrorState.AwaitingProjection
+                    }
+                    Log.i(TAG, "State set. Current state: ${_state.value::class.simpleName}")
                     
                     // Monitor session events (control signals from peer)
                     session.events.collect { event ->
