@@ -13,11 +13,17 @@ import android.os.IBinder
 import android.provider.Settings
 import android.text.InputType
 import android.util.Log
+import android.animation.ObjectAnimator
 import android.view.View
+import android.view.animation.LinearInterpolator
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
+import com.google.android.material.bottomnavigation.BottomNavigationView
+import java.util.Locale
+import java.util.Timer
+import java.util.TimerTask
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -44,16 +50,49 @@ import androidx.preference.PreferenceManager
 class MainActivity : AppCompatActivity() {
 
     // -------------------------------------------------------------------------
-    // Views
+    // Views — Kinetic Glass panels
     // -------------------------------------------------------------------------
 
+    // Panels
+    private lateinit var panelHome: View
+    private lateinit var panelScanning: View
+    private lateinit var panelStreaming: View
+    private lateinit var panelConnecting: View
+    private lateinit var panelError: View
+
+    // Home panel
+    private lateinit var discoverButton: Button
+
+    // Scanning panel
     private lateinit var progressBar: ProgressBar
     private lateinit var statusText: TextView
     private lateinit var deviceList: RecyclerView
-    private lateinit var discoverButton: Button
+    private lateinit var radarRing1: View
+    private lateinit var radarRing2: View
+
+    // Streaming panel
     private lateinit var disconnectButton: Button
+    private lateinit var pauseButton: Button
+    private lateinit var streamTimer: TextView
+    private lateinit var streamTargetName: TextView
+    private lateinit var streamStatsHud: TextView
+
+    // Connecting panel
+    private lateinit var connectingLabel: TextView
+    private lateinit var connectingSubLabel: TextView
+
+    // Error panel
+    private lateinit var errorMessage: TextView
+    private lateinit var retryButton: Button
+
+    // Bottom nav
+    private lateinit var bottomNav: BottomNavigationView
 
     private lateinit var deviceAdapter: DeviceAdapter
+
+    // Stream timer state
+    private var streamStartMs = 0L
+    private var streamTimerTask: Timer? = null
     
     private var hudVisible = false
     private var lastStats: SessionStats? = null
@@ -122,27 +161,62 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        progressBar = findViewById(R.id.progressBar)
-        statusText = findViewById(R.id.statusText)
-        deviceList = findViewById(R.id.deviceList)
+        // Panels
+        panelHome      = findViewById(R.id.panelHome)
+        panelScanning  = findViewById(R.id.panelScanning)
+        panelStreaming  = findViewById(R.id.panelStreaming)
+        panelConnecting = findViewById(R.id.panelConnecting)
+        panelError     = findViewById(R.id.panelError)
+
+        // Home
         discoverButton = findViewById(R.id.discoverButton)
+
+        // Scanning
+        progressBar  = findViewById(R.id.progressBar)
+        statusText   = findViewById(R.id.statusText)
+        deviceList   = findViewById(R.id.deviceList)
+        radarRing1   = findViewById(R.id.radarRing1)
+        radarRing2   = findViewById(R.id.radarRing2)
+
+        // Streaming
         disconnectButton = findViewById(R.id.disconnectButton)
+        pauseButton      = findViewById(R.id.pauseButton)
+        streamTimer      = findViewById(R.id.streamTimer)
+        streamTargetName = findViewById(R.id.streamTargetName)
+        streamStatsHud   = findViewById(R.id.streamStatsHud)
+
+        // Connecting
+        connectingLabel    = findViewById(R.id.connectingLabel)
+        connectingSubLabel = findViewById(R.id.connectingSubLabel)
+
+        // Error
+        errorMessage = findViewById(R.id.errorMessage)
+        retryButton  = findViewById(R.id.retryButton)
+
+        // Bottom nav
+        bottomNav = findViewById(R.id.bottomNav)
+        bottomNav.selectedItemId = R.id.nav_mirror
+        bottomNav.setOnItemSelectedListener { item ->
+            when (item.itemId) {
+                R.id.nav_settings -> startActivity(Intent(this, SettingsActivity::class.java))
+                R.id.nav_mirror   -> { /* already on mirror tab */ }
+                else -> { /* history / support — future screens */ }
+            }
+            true
+        }
 
         deviceAdapter = DeviceAdapter(emptyList()) { receiver -> onDeviceSelected(receiver) }
         deviceList.layoutManager = LinearLayoutManager(this)
         deviceList.adapter = deviceAdapter
 
-        discoverButton.setOnClickListener { onDiscoverClicked() }
+        discoverButton.setOnClickListener  { onDiscoverClicked() }
         disconnectButton.setOnClickListener { onDisconnectClicked() }
-        
-        statusText.setOnLongClickListener {
+        pauseButton.setOnClickListener     { /* pause TBD */ }
+        retryButton.setOnClickListener     { onDiscoverClicked() }
+
+        streamStatsHud.setOnLongClickListener {
             hudVisible = !hudVisible
-            if (!hudVisible) {
-                // Restore normal state text
-                mirrorService?.getState()?.value?.let { renderState(it) }
-            } else {
-                lastStats?.let { renderHUD(it) }
-            }
+            streamStatsHud.visibility = if (hudVisible) View.VISIBLE else View.GONE
             true
         }
 
@@ -208,56 +282,93 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderHUD(stats: com.antigravity.mirror.stream.api.SessionStats) {
-        val text = "${stats.fps} FPS | ${stats.bitrateKbps} kbps | Q:${stats.queueDepth} | D:${stats.droppedFrames}"
-        statusText.text = text
-        statusText.visibility = View.VISIBLE
+        val text = "${stats.fps} FPS · ${stats.bitrateKbps} kbps · Q:${stats.queueDepth} · D:${stats.droppedFrames}"
+        streamStatsHud.text = text
+        streamStatsHud.visibility = View.VISIBLE
     }
+
+    // ── panel helpers ──────────────────────────────────────────────────────────
+
+    private fun showPanel(panel: View) {
+        listOf(panelHome, panelScanning, panelStreaming, panelConnecting, panelError)
+            .forEach { it.visibility = if (it === panel) View.VISIBLE else View.GONE }
+    }
+
+    private fun startRadarPulse() {
+        for (ring in listOf(radarRing1, radarRing2)) {
+            ObjectAnimator.ofFloat(ring, "scaleX", 0.6f, 1f).apply {
+                duration = 2000; repeatCount = ObjectAnimator.INFINITE
+                interpolator = LinearInterpolator(); start()
+            }
+            ObjectAnimator.ofFloat(ring, "scaleY", 0.6f, 1f).apply {
+                duration = 2000; repeatCount = ObjectAnimator.INFINITE
+                interpolator = LinearInterpolator(); start()
+            }
+            ObjectAnimator.ofFloat(ring, "alpha", 0.8f, 0f).apply {
+                duration = 2000; repeatCount = ObjectAnimator.INFINITE
+                interpolator = LinearInterpolator(); start()
+            }
+        }
+    }
+
+    private fun startStreamTimer(targetName: String) {
+        streamStartMs = System.currentTimeMillis()
+        streamTargetName.text = targetName
+        streamTimerTask?.cancel()
+        streamTimerTask = Timer().also { timer ->
+            timer.scheduleAtFixedRate(object : TimerTask() {
+                override fun run() {
+                    val elapsed = (System.currentTimeMillis() - streamStartMs) / 1000
+                    val formatted = String.format(Locale.ROOT, "%02d:%02d", elapsed / 60, elapsed % 60)
+                    runOnUiThread { streamTimer.text = formatted }
+                }
+            }, 0L, 1000L)
+        }
+    }
+
+    private fun stopStreamTimer() {
+        streamTimerTask?.cancel()
+        streamTimerTask = null
+    }
+
+    // ── state renderer ─────────────────────────────────────────────────────────
 
     private fun renderState(state: MirrorState) {
         Log.i(TAG, "Rendering state: ${state::class.simpleName}")
         when (state) {
+
             is MirrorState.Idle -> {
                 projectionConsentLaunched = false
-                progressBar.visibility = View.GONE
-                statusText.visibility = View.GONE
-                discoverButton.visibility = View.VISIBLE
-                disconnectButton.visibility = View.GONE
+                stopStreamTimer()
                 deviceAdapter.updateDevices(emptyList())
-                deviceList.visibility = View.VISIBLE
+                showPanel(panelHome)
             }
 
             is MirrorState.Discovering -> {
+                statusText.text = getString(R.string.label_scanning_network)
                 progressBar.visibility = View.VISIBLE
-                statusText.text = getString(R.string.label_discovering)
-                statusText.visibility = View.VISIBLE
-                discoverButton.visibility = View.GONE
-                disconnectButton.visibility = View.GONE
+                deviceAdapter.updateDevices(emptyList())
+                showPanel(panelScanning)
+                startRadarPulse()
             }
 
             is MirrorState.ReceiversFound -> {
                 progressBar.visibility = View.GONE
-                statusText.visibility = View.GONE
-                discoverButton.visibility = View.VISIBLE
-                disconnectButton.visibility = View.GONE
+                statusText.text = getString(R.string.label_scanning_network)
                 deviceAdapter.updateDevices(state.receivers)
-                deviceList.visibility = View.VISIBLE
+                showPanel(panelScanning)
             }
 
             is MirrorState.Connecting -> {
-                progressBar.visibility = View.VISIBLE
-                statusText.text = getString(R.string.label_connecting)
-                statusText.visibility = View.VISIBLE
-                discoverButton.visibility = View.GONE
-                disconnectButton.visibility = View.GONE
+                connectingLabel.text    = getString(R.string.label_connecting)
+                connectingSubLabel.text = ""
+                showPanel(panelConnecting)
             }
 
             is MirrorState.AwaitingProjection -> {
-                progressBar.visibility = View.VISIBLE
-                statusText.text = getString(R.string.label_awaiting_consent)
-                statusText.visibility = View.VISIBLE
-                discoverButton.visibility = View.GONE
-                disconnectButton.visibility = View.GONE
-
+                connectingLabel.text    = getString(R.string.label_awaiting_consent)
+                connectingSubLabel.text = getString(R.string.label_awaiting_consent)
+                showPanel(panelConnecting)
                 if (!projectionConsentLaunched) {
                     projectionConsentLaunched = true
                     launchProjectionConsent()
@@ -265,39 +376,30 @@ class MainActivity : AppCompatActivity() {
             }
 
             is MirrorState.AwaitingPairing -> {
-                progressBar.visibility = View.GONE
-                statusText.text = getString(R.string.label_awaiting_pin)
-                statusText.visibility = View.VISIBLE
+                connectingLabel.text    = getString(R.string.label_awaiting_pin)
+                connectingSubLabel.text = getString(R.string.dialog_pin_message)
+                showPanel(panelConnecting)
                 showPinInputDialog()
             }
 
             is MirrorState.Reconnecting -> {
-                progressBar.visibility = View.VISIBLE
-                statusText.text = getString(R.string.label_reconnecting)
-                statusText.visibility = View.VISIBLE
+                connectingLabel.text    = getString(R.string.label_reconnecting)
+                connectingSubLabel.text = ""
+                showPanel(panelConnecting)
             }
 
             is MirrorState.Streaming -> {
-                progressBar.visibility = View.GONE
-                statusText.text = getString(R.string.label_streaming)
-                statusText.visibility = View.VISIBLE
-                discoverButton.visibility = View.GONE
-                deviceList.visibility = View.GONE
-                disconnectButton.visibility = View.VISIBLE
+                val target = state.receiver?.name ?: "PC"
+                startStreamTimer(target)
+                showPanel(panelStreaming)
             }
 
             is MirrorState.Error -> {
                 projectionConsentLaunched = false
-                progressBar.visibility = View.GONE
-                deviceList.visibility = View.VISIBLE
-
+                stopStreamTimer()
                 val message = state.cause.message ?: "Unknown error"
-                statusText.text = message
-                statusText.visibility = View.VISIBLE
-                discoverButton.visibility = if (state.recoverable) View.VISIBLE else View.GONE
-                disconnectButton.visibility = View.GONE
-
-                // Specific error handling (Miracast/WiFi)
+                errorMessage.text = message
+                showPanel(panelError)
                 if (message.contains("WiFi", ignoreCase = true) || message.contains("network", ignoreCase = true)) {
                     showWifiRequiredDialog(message)
                 }
