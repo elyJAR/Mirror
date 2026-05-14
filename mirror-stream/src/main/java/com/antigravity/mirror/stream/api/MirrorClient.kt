@@ -169,7 +169,11 @@ class MirrorClient(context: Context) {
                         }
                     }
 
-                    _state.value = MirrorState.AwaitingProjection
+                    _state.value = if (session.pairingRequired) {
+                        MirrorState.AwaitingPairing
+                    } else {
+                        MirrorState.AwaitingProjection
+                    }
                     
                     // Monitor session events (control signals from peer)
                     session.events.collect { event ->
@@ -186,6 +190,9 @@ class MirrorClient(context: Context) {
                             }
                             TransportEvent.PairingRequest -> {
                                 _state.value = MirrorState.AwaitingPairing
+                            }
+                            TransportEvent.PairingVerified -> {
+                                _state.value = MirrorState.AwaitingProjection
                             }
                             is TransportEvent.PeerDisconnected -> {
                                 Log.i(TAG, "Peer disconnected: ${event.reason}")

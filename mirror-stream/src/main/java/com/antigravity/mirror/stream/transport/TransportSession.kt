@@ -33,6 +33,11 @@ interface TransportSession {
     val events: Flow<TransportEvent>
 
     /**
+     * True when the session is waiting for a user-entered PIN.
+     */
+    val pairingRequired: Boolean
+
+    /**
      * Observable performance metrics for the session.
      */
     val stats: Flow<com.antigravity.mirror.stream.api.SessionStats>

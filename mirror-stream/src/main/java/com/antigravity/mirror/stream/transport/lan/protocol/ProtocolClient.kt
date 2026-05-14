@@ -32,7 +32,11 @@ private const val MAX_QUEUE_SIZE = 30
 class ProtocolClient(
     private val host: String,
     private val port: Int,
-    private val json: Json = Json { ignoreUnknownKeys = true }
+    private val json: Json = Json {
+        ignoreUnknownKeys = true
+        encodeDefaults = true
+        classDiscriminator = "type"
+    }
 ) {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val selector = SelectorManager(Dispatchers.IO)
@@ -41,7 +45,7 @@ class ProtocolClient(
     private val audioQueue = LinkedList<ByteArray>()
     private val queueSignal = Channel<Unit>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     
-    private val _events = MutableSharedFlow<Any>()
+    private val _events = MutableSharedFlow<Any>(replay = 1)
     val events: SharedFlow<Any> = _events.asSharedFlow()
 
     private val _stats = MutableStateFlow(SessionStats())
@@ -70,15 +74,35 @@ class ProtocolClient(
     }
     
     private var socket: Socket? = null
+    private var controlWriteChannel: ByteWriteChannel? = null
     var negotiatedCodec: String = "video/avc"
         private set
-    
-    private val pinResult = Channel<String>(capacity = 1)
+
+    @Volatile
+    private var awaitingPin: Boolean = false
 
     /** Submit the PIN entered by the user. */
     fun submitPin(pin: String) {
-        pinResult.trySend(pin)
+        if (!awaitingPin) {
+            Log.w(TAG, "submitPin called but no PIN is currently required")
+            return
+        }
+        val channel = controlWriteChannel
+        if (channel == null) {
+            Log.w(TAG, "submitPin called before control channel is ready")
+            return
+        }
+
+        scope.launch {
+            runCatching {
+                channel.writeFrame(TAG_CONTROL, json.encodeToString(VerifyPinMessage(pin = pin)).toByteArray())
+            }.onFailure {
+                Log.e(TAG, "Failed to send verify-pin: ${it.message}")
+            }
+        }
     }
+
+    fun isPairingRequired(): Boolean = awaitingPin
     
     private var lastPongTime = System.currentTimeMillis()
 
@@ -100,6 +124,7 @@ class ProtocolClient(
         
         val readChannel = socket.openReadChannel()
         val writeChannel = socket.openWriteChannel(autoFlush = true)
+        controlWriteChannel = writeChannel
         
         // 1. Handshake: Hello -> HelloAck
         try {
@@ -118,29 +143,25 @@ class ProtocolClient(
             if (ackFrame.tag != TAG_CONTROL) {
                 throw MirrorError.HandshakeFailed("Expected control frame, got ${ackFrame.tag}")
             }
+
+            val ackRaw = String(ackFrame.payload)
+            Log.i(TAG, "Received handshake control payload: $ackRaw")
             
-            val msg = json.decodeFromString<ControlMessage>(String(ackFrame.payload))
+            val msg = try {
+                json.decodeFromString<ControlMessage>(ackRaw)
+            } catch (decodeError: Exception) {
+                Log.e(TAG, "Failed to decode handshake control payload", decodeError)
+                throw MirrorError.HandshakeFailed("Invalid handshake payload: $ackRaw")
+            }
             when (msg) {
                 is HelloAckMessage -> {
                     negotiatedCodec = msg.params.codec
                     Log.i(TAG, "Handshake accepted by ${msg.receiver}. Negotiated: $negotiatedCodec")
                     
                     if (msg.pinRequired) {
+                        awaitingPin = true
                         Log.i(TAG, "PIN required by peer")
                         _events.emit(TransportEvent.PairingRequest)
-                        
-                        // Wait for PIN from user
-                        val pin = pinResult.receive()
-                        
-                        writeChannel.writeFrame(TAG_CONTROL, json.encodeToString(VerifyPinMessage(pin = pin)).toByteArray())
-                        
-                        val authFrame = readChannel.readFrame()
-                        val authMsg = json.decodeFromString<ControlMessage>(String(authFrame.payload))
-                        if (authMsg !is AuthResultMessage || !authMsg.success) {
-                            val error = (authMsg as? AuthResultMessage)?.message ?: "Invalid PIN"
-                            throw MirrorError.HandshakeFailed("Authentication failed: $error")
-                        }
-                        Log.i(TAG, "PIN verification successful")
                     }
                 }
                 is HelloRejectMessage -> {
@@ -251,6 +272,15 @@ class ProtocolClient(
 
     private fun handleControlMessage(msg: ControlMessage) {
         when (msg) {
+            is AuthResultMessage -> {
+                if (msg.success) {
+                    awaitingPin = false
+                    scope.launch { _events.emit(TransportEvent.PairingVerified) }
+                } else {
+                    val error = msg.message ?: "Invalid PIN"
+                    scope.launch { _events.emit(TransportEvent.Error(MirrorError.HandshakeFailed("Authentication failed: $error"))) }
+                }
+            }
             is PongMessage -> {
                 lastPongTime = System.currentTimeMillis()
             }
@@ -317,6 +347,8 @@ class ProtocolClient(
     fun close() {
         Log.i(TAG, "Closing ProtocolClient...")
         scope.cancel()
+        controlWriteChannel = null
+        awaitingPin = false
         runCatching { socket?.close() }
         runCatching { selector.close() }
     }

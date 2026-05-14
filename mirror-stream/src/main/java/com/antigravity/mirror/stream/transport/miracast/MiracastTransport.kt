@@ -81,6 +81,7 @@ private class MiracastTransportSession(
     override val videoSink = Channel<NalUnit>(capacity = 30)
     override val audioSink = Channel<ByteArray>(capacity = 60)
     override val negotiatedCodec: String = "video/avc"
+    override val pairingRequired: Boolean = false
     override val stats: Flow<com.antigravity.mirror.stream.api.SessionStats> = emptyFlow()
 
     private val _events = MutableSharedFlow<TransportEvent>()

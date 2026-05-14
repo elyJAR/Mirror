@@ -9,10 +9,17 @@ if (started) {
   app.quit();
 }
 
+const gotSingleInstanceLock = app.requestSingleInstanceLock();
+
+if (!gotSingleInstanceLock) {
+  app.quit();
+}
+
 let mainWindow: BrowserWindow | null = null;
 const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
 let currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+const advertisedName = `Mirror PC ${process.pid}`;
 
 /**
  * Main application window setup.
@@ -43,6 +50,15 @@ const createWindow = () => {
 
   startNetworkServices(mainWindow);
 };
+
+app.on('second-instance', () => {
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore();
+    }
+    mainWindow.focus();
+  }
+});
 
 /**
  * Starts the mDNS advertiser and TCP server for the Mirror protocol.
@@ -103,30 +119,59 @@ function startNetworkServices(window: BrowserWindow) {
     });
   });
 
+  tcpServer.on('error', (error: NodeJS.ErrnoException) => {
+    if (error.code === 'EADDRINUSE') {
+      console.error('TCP port 8765 is already in use. Another receiver instance is probably running.');
+    } else {
+      console.error('TCP server error:', error);
+    }
+
+    if (mainWindow) {
+      window.webContents.send('peer-disconnected');
+    }
+  });
+
   // Listen on all interfaces
   tcpServer.listen(8765, '0.0.0.0', () => {
     console.log('TCP Server listening on port 8765');
   });
 
   // Advertise service via mDNS
-  bonjour.publish({ 
-    name: 'Mirror PC', 
-    type: 'mirror', 
-    protocol: 'tcp', 
-    port: 8765 
-  });
+  try {
+    bonjour.publish({ 
+      name: advertisedName,
+      type: 'mirror', 
+      protocol: 'tcp', 
+      port: 8765 
+    });
+  } catch (error) {
+    console.warn('mDNS advertise failed; continuing with TCP server only:', error);
+  }
 }
 
 function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: BrowserWindow) {
   if (tag === 0x01) { // Control Message (JSON)
     try {
-      const msg = JSON.parse(payload.toString());
+      const raw = payload.toString();
+      const msg = JSON.parse(raw);
+      const inferredType =
+        typeof msg.type === 'string'
+          ? msg.type
+          : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
+      console.log('Received control message raw:', raw);
+      console.log('Received control message type:', msg.type);
+      console.log('Received control message keys:', Object.keys(msg));
+      if (inferredType !== msg.type) {
+        console.log('Inferred control message type:', inferredType);
+      }
       window.webContents.send('control-message', msg);
       
       // Automatic handshake response
-      if (msg.type === 'hello') {
+      if (inferredType === 'hello') {
         const supportedCodecs = msg.codecs || ['video/avc'];
         const chosenCodec = supportedCodecs.includes('video/hevc') ? 'video/hevc' : 'video/avc';
+
+        console.log('Sending hello-ack with PIN required');
         
         sendControl(socket, {
           type: 'hello-ack',
@@ -134,8 +179,10 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           params: { width: 1280, height: 720, fps: 30, codec: chosenCodec },
           pinRequired: true
         });
-      } else if (msg.type === 'verify-pin') {
+      } else if (inferredType === 'verify-pin') {
+        console.log('Received verify-pin');
         const isMatch = msg.pin === currentPin;
+        console.log('PIN match:', isMatch);
         sendControl(socket, {
           type: 'auth-result',
           success: isMatch,
@@ -165,7 +212,14 @@ function sendControl(socket: net.Socket, msg: any) {
   const header = Buffer.alloc(5);
   header.writeUInt8(0x01, 0);
   header.writeInt32BE(payload.length, 1);
-  socket.write(Buffer.concat([header, payload]));
+  const frame = Buffer.concat([header, payload]);
+  console.log('Sending control message raw:', json);
+  console.log('Sending control message bytes:', frame.length, 'socketWritable:', socket.writable);
+  socket.write(frame, (err) => {
+    if (err) {
+      console.error('Failed to write control frame:', err);
+    }
+  });
 }
 
 app.on('ready', createWindow);

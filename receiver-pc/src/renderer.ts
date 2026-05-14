@@ -30,6 +30,7 @@ let decoder: VideoDecoder | null = null;
 let audioDecoder: AudioDecoder | null = null;
 let audioCtx: AudioContext | null = null;
 let nextAudioTime = 0;
+let inputEnabled = false;
 
 let isConfigured = false;
 let frameCount = 0;
@@ -133,6 +134,7 @@ window.electronAPI.onPeerConnected((peer) => {
   peerEl.textContent = peer.address;
   statusEl.textContent = 'Connected, waiting for stream...';
   initDecoder(); // Re-init on new connection
+  inputEnabled = false;
 });
 
 window.electronAPI.onPeerDisconnected(() => {
@@ -140,6 +142,7 @@ window.electronAPI.onPeerDisconnected(() => {
   statusEl.textContent = 'Waiting for phone...';
   isConfigured = false;
   pairingEl.style.display = 'none';
+  inputEnabled = false;
 });
 
 window.electronAPI.onControlMessage((msg) => {
@@ -228,6 +231,10 @@ canvas.addEventListener('mousemove', (e) => {
 });
 
 function sendTouch(action: number, e: MouseEvent) {
+  if (!inputEnabled) {
+    return;
+  }
+
   const rect = canvas.getBoundingClientRect();
   const x = (e.clientX - rect.left) / rect.width;
   const y = (e.clientY - rect.top) / rect.height;
@@ -246,6 +253,10 @@ function sendTouch(action: number, e: MouseEvent) {
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'h') {
     // Already handled above
+    return;
+  }
+
+  if (!inputEnabled) {
     return;
   }
   
@@ -273,4 +284,5 @@ window.electronAPI.onPairingPin((pin) => {
 window.electronAPI.onPairingSuccess(() => {
   pairingEl.style.display = 'none';
   statusEl.textContent = 'Authenticated. Starting stream...';
+  inputEnabled = true;
 });

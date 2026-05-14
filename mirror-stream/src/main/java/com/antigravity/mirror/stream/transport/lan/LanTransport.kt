@@ -48,11 +48,17 @@ private class LanTransportSession(
     override val audioSink = Channel<ByteArray>(capacity = 60)
     override val stats: Flow<com.antigravity.mirror.stream.api.SessionStats> = client.stats
     override val negotiatedCodec: String = client.negotiatedCodec
+    override val pairingRequired: Boolean
+        get() = client.isPairingRequired()
 
-    private val _events = MutableSharedFlow<TransportEvent>()
+    private val _events = MutableSharedFlow<TransportEvent>(replay = 1, extraBufferCapacity = 8)
     override val events: Flow<TransportEvent> = _events.asSharedFlow()
 
     init {
+        if (client.isPairingRequired()) {
+            _events.tryEmit(TransportEvent.PairingRequest)
+        }
+
         // Bridge: videoSink (from MirrorClient) -> ProtocolClient.sendVideo
         sessionScope.launch {
             try {

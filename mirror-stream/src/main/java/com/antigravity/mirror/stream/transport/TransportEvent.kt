@@ -43,4 +43,9 @@ sealed interface TransportEvent {
      * The peer requires a PIN to continue.
      */
     data object PairingRequest : TransportEvent
+
+    /**
+     * PIN verification completed successfully and the session can proceed.
+     */
+    data object PairingVerified : TransportEvent
 }
