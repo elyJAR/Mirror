@@ -158,7 +158,9 @@ class MirrorClient(context: Context) {
                     val transport = transports[target.transportId] ?: throw IllegalStateException("Transport not found")
                     
                     Log.i(TAG, "Starting session via ${target.transportId} to ${target.name} (Attempt ${attempts + 1})")
+                    Log.i(TAG, "About to call transport.connect()...")
                     val session = transport.connect(target, config)
+                    Log.i(TAG, "transport.connect() returned")
                     activeSession = session
                     Log.i(TAG, "transport.connect() completed successfully")
                     
