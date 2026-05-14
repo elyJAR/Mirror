@@ -18,7 +18,7 @@ if (!gotSingleInstanceLock) {
 let mainWindow: BrowserWindow | null = null;
 const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
-let currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 const advertisedName = `Mirror PC ${process.pid}`;
 
 /**
@@ -221,7 +221,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
   return true;
 }
 
-function sendControl(socket: net.Socket, msg: any) {
+function sendControl(socket: net.Socket, msg: Record<string, unknown>) {
   const json = JSON.stringify(msg);
   const payload = Buffer.from(json);
   const header = Buffer.alloc(5);
