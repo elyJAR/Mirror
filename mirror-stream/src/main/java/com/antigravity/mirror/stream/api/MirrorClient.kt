@@ -253,39 +253,39 @@ class MirrorClient(context: Context) {
 
         Log.i(TAG, "Projection granted, starting media pipeline")
 
-        val encoder = VideoEncoder(
-            width = config.width,
-            height = config.height,
-            bitrateBps = config.bitrateBps,
-            frameRate = config.fps,
-            mimeType = session.negotiatedCodec
-        )
-        val capture = ScreenCaptureEngine(projection, encoder)
-        
-        // Wire the pipeline: Encoder -> TransportSession
-        capture.setNalUnitCallback { bytes, ts ->
-            session.videoSink.trySend(NalUnit(bytes, ts))
-        }
-        
-        videoEncoder = encoder
-        captureEngine = capture
-        
-        // Start audio capture (Android 10+)
-        audioEncoder = AudioEncoder(projection).apply {
-            start { data, pts ->
-                session.audioSink.trySend(data)
+            try {
+                val encoder = VideoEncoder(
+                    width = config.width,
+                    height = config.height,
+                    bitrateBps = config.bitrateBps,
+                    frameRate = config.fps,
+                    mimeType = session.negotiatedCodec
+                )
+                val capture = ScreenCaptureEngine(projection, encoder)
+            
+                // Wire the pipeline: Encoder -> TransportSession
+                capture.setNalUnitCallback { bytes, ts ->
+                    session.videoSink.trySend(NalUnit(bytes, ts))
+                }
+            
+                videoEncoder = encoder
+                captureEngine = capture
+            
+                // Start audio capture (Android 10+)
+                audioEncoder = AudioEncoder(projection).apply {
+                    start { data, pts ->
+                        session.audioSink.trySend(data)
+                    }
+                }
+            
+                // Default to 160 DPI
+                capture.start(config.width, config.height, 160)
+                _state.value = MirrorState.Streaming
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to initialize media pipeline: ${e.message}", e)
+                _state.value = MirrorState.Error(MirrorError.EncoderFailure(e), false)
+                disconnect()
             }
-        }
-        
-        try {
-            // Default to 160 DPI
-            capture.start(config.width, config.height, 160)
-            _state.value = MirrorState.Streaming
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to start capture: ${e.message}", e)
-            _state.value = MirrorState.Error(MirrorError.EncoderFailure(e), false)
-            disconnect()
-        }
     }
 
     /** Stop the active session, if any. Idempotent. */
