@@ -169,11 +169,15 @@ class MirrorClient(context: Context) {
                         }
                     }
 
+                    Log.i(TAG, "Session established. pairingRequired=${session.pairingRequired}")
                     _state.value = if (session.pairingRequired) {
+                        Log.i(TAG, "Setting state to AwaitingPairing")
                         MirrorState.AwaitingPairing
                     } else {
+                        Log.i(TAG, "Setting state to AwaitingProjection")
                         MirrorState.AwaitingProjection
                     }
+                    Log.i(TAG, "State set. Current state: ${_state.value::class.simpleName}")
                     
                     // Monitor session events (control signals from peer)
                     session.events.collect { event ->
