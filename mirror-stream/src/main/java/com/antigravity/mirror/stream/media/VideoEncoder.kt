@@ -255,7 +255,7 @@ class VideoEncoder(
             return if (spsBuffer != null) {
                 spsBuffer!! + startCode + idrStripped
             } else {
-                startCode + idrStripped
+                idrStripped
             }
         }
 
@@ -263,11 +263,11 @@ class VideoEncoder(
         val pps = ppsBuffer
 
         if (sps == null || pps == null) {
-            // No SPS/PPS available — return IDR as-is (with start code prepended)
-            return startCode + idrStripped
+            // No SPS/PPS available — return IDR as-is (receiver will prepend start code)
+            return idrStripped
         }
 
-        return startCode + sps + startCode + pps + startCode + idrStripped
+        return sps + startCode + pps + startCode + idrStripped
     }
 
     /**

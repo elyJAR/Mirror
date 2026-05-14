@@ -44,6 +44,7 @@ class ProtocolClient(
     private val videoQueue = LinkedList<NalUnit>()
     private val audioQueue = LinkedList<ByteArray>()
     private val queueSignal = Channel<Unit>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+    private val writeMutex = kotlinx.coroutines.sync.Mutex()
     
     private val _events = MutableSharedFlow<Any>(replay = 1)
     val events: SharedFlow<Any> = _events.asSharedFlow()
@@ -95,7 +96,9 @@ class ProtocolClient(
 
         scope.launch {
             runCatching {
-                channel.writeFrame(TAG_CONTROL, json.encodeToString(VerifyPinMessage(pin = pin)).toByteArray())
+                writeMutex.withLock {
+                    channel.writeFrame(TAG_CONTROL, json.encodeToString(VerifyPinMessage(pin = pin)).toByteArray())
+                }
             }.onFailure {
                 Log.e(TAG, "Failed to send verify-pin: ${it.message}")
             }
@@ -137,7 +140,9 @@ class ProtocolClient(
                 device = "${Build.MANUFACTURER} ${Build.MODEL}",
                 codecs = codecs
             )
-            writeChannel.writeFrame(TAG_CONTROL, json.encodeToString(hello).toByteArray())
+            writeMutex.withLock {
+                writeChannel.writeFrame(TAG_CONTROL, json.encodeToString(hello).toByteArray())
+            }
             
             val ackFrame = readChannel.readFrame()
             if (ackFrame.tag != TAG_CONTROL) {
@@ -226,7 +231,9 @@ class ProtocolClient(
                     }
                     if (nal == null) break
                     
-                    writeChannel.writeFrame(TAG_VIDEO, nal!!.payload)
+                    writeMutex.withLock {
+                        writeChannel.writeFrame(TAG_VIDEO, nal!!.payload)
+                    }
                     framesSent++
                     bytesSent += nal!!.payload.size
                 }
@@ -239,7 +246,9 @@ class ProtocolClient(
                     }
                     if (audio == null) break
                     
-                    writeChannel.writeFrame(TAG_AUDIO, audio)
+                    writeMutex.withLock {
+                        writeChannel.writeFrame(TAG_AUDIO, audio)
+                    }
                     bytesSent += audio.size
                 }
             }
@@ -255,7 +264,9 @@ class ProtocolClient(
             while (true) {
                 delay(5000)
                 val ping = PingMessage(timestamp = System.currentTimeMillis())
-                writeChannel.writeFrame(TAG_CONTROL, json.encodeToString(ping).toByteArray())
+                writeMutex.withLock {
+                    writeChannel.writeFrame(TAG_CONTROL, json.encodeToString(ping).toByteArray())
+                }
             }
         } catch (e: Exception) {
             // Loop will exit on scope cancellation
