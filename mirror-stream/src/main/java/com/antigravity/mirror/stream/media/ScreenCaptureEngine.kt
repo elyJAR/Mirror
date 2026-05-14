@@ -3,6 +3,7 @@ package com.antigravity.mirror.stream.media
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.projection.MediaProjection
+import android.os.Build
 import android.util.Log
 
 private const val TAG = "MirrorApp/ScreenCaptureEngine"
@@ -58,6 +59,16 @@ class ScreenCaptureEngine(
      * Requirements: 8.1, 8.3
      */
     fun start(width: Int, height: Int, dpi: Int) {
+        // Android 14 (API 34) requires a callback to be registered before createVirtualDisplay()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            projection.registerCallback(object : MediaProjection.Callback() {
+                override fun onStop() {
+                    Log.i(TAG, "MediaProjection stopped by system")
+                    stop()
+                }
+            }, null)
+        }
+
         // Step 1: configure encoder and get its input surface
         val surface = encoder.configure()
 
