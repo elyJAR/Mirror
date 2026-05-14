@@ -214,6 +214,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderState(state: MirrorState) {
+        Log.i(TAG, "Rendering state: ${state::class.simpleName}")
         when (state) {
             is MirrorState.Idle -> {
                 projectionConsentLaunched = false
@@ -373,6 +374,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showPinInputDialog() {
+        Log.i(TAG, "Showing PIN input dialog")
         val input = EditText(this).apply {
             inputType = InputType.TYPE_CLASS_NUMBER
             hint = "0000"
