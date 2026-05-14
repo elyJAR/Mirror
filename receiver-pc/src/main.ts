@@ -3,7 +3,28 @@ import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { Bonjour } from 'bonjour-service';
 import * as net from 'net';
+import * as os from 'node:os';
 
+function getLocalIpAddress(): string | undefined {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    // Skip virtual adapters commonly found on Windows/Linux
+    if (name.toLowerCase().includes('veth') || 
+        name.toLowerCase().includes('vmware') || 
+        name.toLowerCase().includes('virtual') ||
+        name.toLowerCase().includes('wsl')) {
+      continue;
+    }
+    const iface = interfaces[name];
+    if (!iface) continue;
+    for (const net of iface) {
+      if (net.family === 'IPv4' && !net.internal) {
+        return net.address;
+      }
+    }
+  }
+  return undefined;
+}
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
@@ -159,7 +180,8 @@ function startNetworkServices(window: BrowserWindow) {
       name: advertisedName,
       type: 'mirror', 
       protocol: 'tcp', 
-      port: 8765 
+      port: 8765,
+      host: getLocalIpAddress()
     });
   } catch (error) {
     console.warn('mDNS advertise failed; continuing with TCP server only:', error);
