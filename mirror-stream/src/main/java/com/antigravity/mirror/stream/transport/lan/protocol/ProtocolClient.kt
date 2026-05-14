@@ -200,10 +200,14 @@ class ProtocolClient(
                     Log.w(TAG, "Received unexpected video frame from receiver")
                 }
             }
+        } catch (e: io.ktor.utils.io.ClosedChannelException) {
+            if (scope.isActive) {
+                Log.i(TAG, "Read loop: channel closed (expected during shutdown)")
+            }
         } catch (e: Exception) {
             if (scope.isActive) {
-                Log.e(TAG, "Read loop failed: ${e.message}")
-                _events.emit(ByeMessage(reason = "connection-loss"))
+                Log.e(TAG, "Read loop failed: ${e.message}", e)
+                runCatching { _events.emit(ByeMessage(reason = "connection-loss")) }
             }
         }
     }
@@ -238,9 +242,13 @@ class ProtocolClient(
                     bytesSent += audio.size
                 }
             }
+        } catch (e: io.ktor.utils.io.ClosedChannelException) {
+            if (scope.isActive) {
+                Log.i(TAG, "Write loop: channel closed (expected during shutdown)")
+            }
         } catch (e: Exception) {
             if (scope.isActive) {
-                Log.e(TAG, "Write loop failed: ${e.message}")
+                Log.e(TAG, "Write loop failed: ${e.message}", e)
             }
         }
     }
@@ -345,13 +353,37 @@ class ProtocolClient(
 
     /**
      * Closes the session and releases all networking resources.
+     * Safe to call multiple times.
      */
     fun close() {
         Log.i(TAG, "Closing ProtocolClient...")
-        scope.cancel()
-        controlWriteChannel = null
+        
+        // Step 1: Close the socket first so readLoop/writeLoop get ClosedChannelException and exit cleanly
+        runCatching {
+            socket?.close()
+            Log.i(TAG, "Socket closed")
+        }.onFailure { Log.w(TAG, "Socket close failed: ${it.message}") }
+        
+        // Step 2: Close the control channel to signal loops to stop
+        runCatching {
+            controlWriteChannel?.close()
+            Log.i(TAG, "Control channel closed")
+        }.onFailure { Log.w(TAG, "Control channel close failed: ${it.message}") }
+        
+        // Step 3: Cancel the scope and wait for coroutines to exit
+        runCatching {
+            scope.cancel()
+            Log.i(TAG, "Scope cancelled")
+        }.onFailure { Log.w(TAG, "Scope cancel failed: ${it.message}") }
+        
+        // Step 4: Close the selector (this is the most likely to throw)
+        runCatching {
+            selector.close()
+            Log.i(TAG, "Selector closed")
+        }.onFailure { Log.w(TAG, "Selector close failed: ${it.message}") }
+        
         awaitingPin = false
-        runCatching { socket?.close() }
-        runCatching { selector.close() }
+        controlWriteChannel = null
+        Log.i(TAG, "ProtocolClient fully closed")
     }
 }
