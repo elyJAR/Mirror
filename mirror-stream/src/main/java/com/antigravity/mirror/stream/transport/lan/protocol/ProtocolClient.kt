@@ -180,10 +180,12 @@ class ProtocolClient(
         lastPongTime = System.currentTimeMillis()
 
         // 2. Start protocol loops
-        launch { readLoop(readChannel) }
-        launch { writeLoop(writeChannel) }
-        launch { pingLoop(writeChannel) }
-        launch { watchdogLoop() }
+        scope.launch { readLoop(readChannel) }
+        scope.launch { writeLoop(writeChannel) }
+        scope.launch { pingLoop(writeChannel) }
+        scope.launch { watchdogLoop() }
+        
+        Log.i(TAG, "Protocol loops launched, connect() returning")
     }
 
     private suspend fun readLoop(readChannel: ByteReadChannel) {
