@@ -48,7 +48,7 @@ class ProtocolClient(
     private val queueSignal = Channel<Unit>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     private val writeMutex = kotlinx.coroutines.sync.Mutex()
     
-    private val _events = MutableSharedFlow<Any>(replay = 1)
+    private val _events = MutableSharedFlow<Any>(replay = 0, extraBufferCapacity = 8)
     val events: SharedFlow<Any> = _events.asSharedFlow()
 
     private val _stats = MutableStateFlow(SessionStats())

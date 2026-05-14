@@ -51,7 +51,7 @@ private class LanTransportSession(
     override val pairingRequired: Boolean
         get() = client.isPairingRequired()
 
-    private val _events = MutableSharedFlow<TransportEvent>(replay = 1, extraBufferCapacity = 8)
+    private val _events = MutableSharedFlow<TransportEvent>(replay = 0, extraBufferCapacity = 16)
     override val events: Flow<TransportEvent> = _events.asSharedFlow()
 
     init {

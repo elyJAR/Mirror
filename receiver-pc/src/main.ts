@@ -132,12 +132,6 @@ function startNetworkServices(window: BrowserWindow) {
       console.error('Socket error:', err);
     });
 
-    // Handle outgoing control messages from renderer
-    ipcMain.handle('send-control', async (_event, msg) => {
-      if (!socket.destroyed) {
-        sendControl(socket, msg);
-      }
-    });
   });
 
   tcpServer.on('error', (error: NodeJS.ErrnoException) => {
