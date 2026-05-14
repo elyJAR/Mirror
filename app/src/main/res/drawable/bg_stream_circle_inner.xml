@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inner streaming circle — slightly brighter fill -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
+    <solid android:color="#15111827" />
+    <stroke android:width="2dp" android:color="#663B8BFF" />
+</shape>

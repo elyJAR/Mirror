@@ -30,4 +30,29 @@
     <string name="dialog_pin_title">Pairing Required</string>
     <string name="dialog_pin_message">Enter the 4-digit PIN displayed on your PC screen.</string>
     <string name="error_incorrect_pin">Incorrect PIN. Please try again.</string>
+
+    <!-- Kinetic Glass UI -->
+    <string name="status_system_ready">SYSTEM READY</string>
+    <string name="status_streaming">STREAMING</string>
+    <string name="home_headline">Seamless Connection</string>
+    <string name="home_subtitle">Initiate zero-latency streaming to nearby displays with unparalleled clarity.</string>
+    <string name="btn_start_mirroring">START MIRRORING</string>
+    <string name="btn_pause_mirroring">Pause Mirroring</string>
+    <string name="btn_stop_mirroring">Stop Mirroring</string>
+    <string name="label_scanning_network">SCANNING LOCAL NETWORK</string>
+    <string name="label_discovering">Discovering Receivers</string>
+    <string name="label_duration">DURATION</string>
+    <string name="label_target_device">TARGET DEVICE</string>
+    <string name="section_capabilities">CORE CAPABILITIES</string>
+    <string name="cap_latency">Ultra-Low Latency</string>
+    <string name="cap_latency_desc">Real-time sync optimised for gaming and presentations.</string>
+    <string name="cap_quality">Lossless Quality</string>
+    <string name="cap_quality_desc">Up to 4K resolution on compatible displays.</string>
+    <string name="cap_multi">Multi-Target</string>
+    <string name="cap_multi_desc">Cast to multiple displays simultaneously.</string>
+    <string name="error_connection_failed">Connection Failed</string>
+    <string name="nav_mirror">Mirror</string>
+    <string name="nav_history">History</string>
+    <string name="nav_settings">Settings</string>
+    <string name="nav_support">Support</string>
 </resources>

@@ -1,10 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
-    <color name="black">#FF000000</color>
+    <!-- Kinetic Glass base palette -->
+    <color name="kg_bg_deep">#FF0A0E1A</color>
+    <color name="kg_bg_surface">#FF111827</color>
+    <color name="kg_bg_surface_alt">#FF1A2235</color>
+    <color name="kg_bg_card">#FF141C2E</color>
+
+    <!-- Electric blue accent -->
+    <color name="kg_accent">#FF3B8BFF</color>
+    <color name="kg_accent_dim">#663B8BFF</color>
+    <color name="kg_accent_glow">#333B8BFF</color>
+
+    <!-- Stop / destructive -->
+    <color name="kg_stop">#FFFF5C5C</color>
+    <color name="kg_stop_dim">#40FF5C5C</color>
+
+    <!-- Text -->
+    <color name="kg_text_primary">#FFFFFFFF</color>
+    <color name="kg_text_secondary">#FF8A97B0</color>
+    <color name="kg_text_hint">#FF4A5568</color>
+
+    <!-- Status pill -->
+    <color name="kg_status_ready">#FF22C55E</color>
+    <color name="kg_status_scanning">#FF3B8BFF</color>
+
+    <!-- Signal / icon tint -->
+    <color name="kg_icon_tint">#FF6B80A0</color>
+
+    <!-- Divider -->
+    <color name="kg_divider">#1AFFFFFF</color>
+
+    <!-- Legacy keep-alive (required by Material theme attrs) -->
     <color name="white">#FFFFFFFF</color>
+    <color name="black">#FF000000</color>
 </resources>

@@ -1,12 +1,95 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.AndroidScreenMirror" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <item name="colorPrimary">@color/purple_500</item>
-        <item name="colorPrimaryVariant">@color/purple_700</item>
-        <item name="colorOnPrimary">@color/white</item>
-        <item name="colorSecondary">@color/teal_200</item>
-        <item name="colorSecondaryVariant">@color/teal_700</item>
-        <item name="colorOnSecondary">@color/black</item>
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+    <style name="Theme.AndroidScreenMirror" parent="Theme.MaterialComponents.NoActionBar">
+        <!-- Core palette -->
+        <item name="colorPrimary">@color/kg_accent</item>
+        <item name="colorPrimaryVariant">@color/kg_bg_surface</item>
+        <item name="colorOnPrimary">@color/kg_text_primary</item>
+        <item name="colorSecondary">@color/kg_accent</item>
+        <item name="colorSecondaryVariant">@color/kg_bg_surface_alt</item>
+        <item name="colorOnSecondary">@color/kg_text_primary</item>
+        <item name="colorSurface">@color/kg_bg_surface</item>
+        <item name="colorOnSurface">@color/kg_text_primary</item>
+        <item name="colorBackground">@color/kg_bg_deep</item>
+        <item name="colorOnBackground">@color/kg_text_primary</item>
+        <item name="colorError">@color/kg_stop</item>
+        <item name="colorOnError">@color/kg_text_primary</item>
+
+        <!-- System bars -->
+        <item name="android:statusBarColor">@color/kg_bg_deep</item>
+        <item name="android:navigationBarColor">@color/kg_bg_deep</item>
+        <item name="android:windowLightStatusBar">false</item>
+
+        <!-- Window -->
+        <item name="android:windowBackground">@color/kg_bg_deep</item>
+
+        <!-- Card defaults -->
+        <item name="materialCardViewStyle">@style/Widget.Mirror.CardView</item>
+
+        <!-- Button defaults -->
+        <item name="materialButtonStyle">@style/Widget.Mirror.Button</item>
     </style>
+
+    <!-- Glass card -->
+    <style name="Widget.Mirror.CardView" parent="Widget.MaterialComponents.CardView">
+        <item name="cardBackgroundColor">@color/kg_bg_card</item>
+        <item name="cardCornerRadius">16dp</item>
+        <item name="cardElevation">0dp</item>
+        <item name="strokeColor">@color/kg_divider</item>
+        <item name="strokeWidth">1dp</item>
+    </style>
+
+    <!-- Primary button: full electric-blue fill -->
+    <style name="Widget.Mirror.Button" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/kg_accent</item>
+        <item name="android:textColor">@color/kg_text_primary</item>
+        <item name="cornerRadius">12dp</item>
+        <item name="android:letterSpacing">0.08</item>
+    </style>
+
+    <!-- Outlined / ghost button -->
+    <style name="Widget.Mirror.Button.Outlined" parent="Widget.MaterialComponents.Button.OutlinedButton">
+        <item name="strokeColor">@color/kg_accent</item>
+        <item name="android:textColor">@color/kg_accent</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <!-- Destructive (Stop Mirroring) button -->
+    <style name="Widget.Mirror.Button.Destructive" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/kg_stop_dim</item>
+        <item name="strokeColor">@color/kg_stop</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/kg_stop</item>
+        <item name="cornerRadius">12dp</item>
+    </style>
+
+    <!-- Connect chip on device row -->
+    <style name="Widget.Mirror.Button.Connect" parent="Widget.MaterialComponents.Button">
+        <item name="backgroundTint">@color/kg_accent_dim</item>
+        <item name="strokeColor">@color/kg_accent</item>
+        <item name="strokeWidth">1dp</item>
+        <item name="android:textColor">@color/kg_accent</item>
+        <item name="cornerRadius">8dp</item>
+        <item name="android:paddingStart">12dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:paddingTop">6dp</item>
+        <item name="android:paddingBottom">6dp</item>
+    </style>
+
+    <!-- Bottom nav bar -->
+    <style name="Widget.Mirror.BottomNav" parent="Widget.MaterialComponents.BottomNavigationView">
+        <item name="android:background">@color/kg_bg_surface</item>
+        <item name="itemIconTint">@color/selector_nav_icon</item>
+        <item name="itemTextColor">@color/selector_nav_icon</item>
+        <item name="labelVisibilityMode">labeled</item>
+    </style>
+
+    <!-- Toolbar title -->
+    <style name="TextAppearance.Mirror.Toolbar" parent="TextAppearance.MaterialComponents.Headline6">
+        <item name="android:textColor">@color/kg_text_primary</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">0.02</item>
+    </style>
+
 </resources>

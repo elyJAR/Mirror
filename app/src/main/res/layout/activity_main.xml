@@ -1,86 +1,635 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  activity_main.xml  –  Kinetic Glass UI
+  Single-activity layout. Visibility of each "panel" is toggled by MainActivity
+  in response to MirrorState changes. The BottomNavigationView drives tab switching.
+-->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/kg_bg_deep"
     tools:context=".ui.MainActivity">
 
-    <!-- App bar -->
+    <!-- ═══════════════════════════════════════════════════════════
+         TOP APP BAR
+    ═══════════════════════════════════════════════════════════ -->
     <com.google.android.material.appbar.AppBarLayout
         android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content">
+        android:layout_height="wrap_content"
+        android:backgroundTint="@color/kg_bg_deep"
+        app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="?attr/actionBarSize"
-            app:title="Screen Mirror" />
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            app:title="MirrorStream"
+            app:titleTextColor="@color/kg_text_primary"
+            app:titleTextAppearance="@style/TextAppearance.Mirror.Toolbar"
+            app:navigationIcon="@drawable/ic_menu"
+            app:navigationIconTint="@color/kg_text_secondary" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- Main content -->
+    <!-- ═══════════════════════════════════════════════════════════
+         SCROLLABLE CONTENT  (below toolbar, above bottom nav)
+    ═══════════════════════════════════════════════════════════ -->
     <androidx.core.widget.NestedScrollView
+        android:id="@+id/scrollContent"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:paddingBottom="72dp"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <LinearLayout
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="16dp">
+            android:layout_height="wrap_content">
 
-            <!-- Progress spinner (visible during Discovering / Connecting) -->
-            <ProgressBar
-                android:id="@+id/progressBar"
-                style="?android:attr/progressBarStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center_horizontal"
-                android:layout_marginBottom="8dp"
-                android:visibility="gone" />
-
-            <!-- Status text (Discovering / Connecting / Streaming / error message) -->
-            <TextView
-                android:id="@+id/statusText"
+            <!-- ─────────────────────────────────────────────────
+                 PANEL: HOME  (Idle state)
+            ───────────────────────────────────────────────────── -->
+            <LinearLayout
+                android:id="@+id/panelHome"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="8dp"
-                android:gravity="center"
-                android:textAppearance="?attr/textAppearanceBody1"
-                android:visibility="gone"
-                tools:text="Searching for devices..." />
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:visibility="visible">
 
-            <!-- Device list -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/deviceList"
+                <!-- System-ready status pill -->
+                <LinearLayout
+                    android:id="@+id/statusPill"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_pill_ready"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="6dp"
+                    android:paddingBottom="6dp">
+
+                    <View
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_dot_green" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="@string/status_system_ready"
+                        android:textColor="@color/kg_status_ready"
+                        android:textSize="12sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.08" />
+
+                </LinearLayout>
+
+                <!-- Monitor / hero graphic -->
+                <ImageView
+                    android:layout_width="160dp"
+                    android:layout_height="120dp"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="24dp"
+                    android:src="@drawable/ic_monitor_hero"
+                    android:tint="@color/kg_accent"
+                    android:contentDescription="@null" />
+
+                <!-- Hero headline -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:gravity="center"
+                    android:text="@string/home_headline"
+                    android:textColor="@color/kg_text_primary"
+                    android:textSize="22sp"
+                    android:textStyle="bold"
+                    android:lineSpacingMultiplier="1.2" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:text="@string/home_subtitle"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="13sp" />
+
+                <!-- START MIRRORING CTA -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/discoverButton"
+                    style="@style/Widget.Mirror.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="52dp"
+                    android:layout_marginTop="28dp"
+                    android:text="@string/btn_start_mirroring"
+                    android:textSize="15sp"
+                    android:letterSpacing="0.06"
+                    app:icon="@drawable/ic_cast"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp" />
+
+                <!-- CORE CAPABILITIES header -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="32dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="@string/section_capabilities"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true" />
+
+                <!-- Capability cards row -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:weightSum="3">
+
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/Widget.Mirror.CardView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="12dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_bolt"
+                                android:tint="@color/kg_accent"
+                                android:contentDescription="@null" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="@string/cap_latency"
+                                android:textColor="@color/kg_text_primary"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/cap_latency_desc"
+                                android:textColor="@color/kg_text_secondary"
+                                android:textSize="10sp" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/Widget.Mirror.CardView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="3dp"
+                        android:layout_marginEnd="3dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="12dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_hd"
+                                android:tint="@color/kg_accent"
+                                android:contentDescription="@null" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="@string/cap_quality"
+                                android:textColor="@color/kg_text_primary"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/cap_quality_desc"
+                                android:textColor="@color/kg_text_secondary"
+                                android:textSize="10sp" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <com.google.android.material.card.MaterialCardView
+                        style="@style/Widget.Mirror.CardView"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="6dp">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical"
+                            android:padding="12dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:src="@drawable/ic_devices"
+                                android:tint="@color/kg_accent"
+                                android:contentDescription="@null" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="8dp"
+                                android:text="@string/cap_multi"
+                                android:textColor="@color/kg_text_primary"
+                                android:textSize="12sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="4dp"
+                                android:text="@string/cap_multi_desc"
+                                android:textColor="@color/kg_text_secondary"
+                                android:textSize="10sp" />
+                        </LinearLayout>
+                    </com.google.android.material.card.MaterialCardView>
+
+                </LinearLayout>
+
+            </LinearLayout>
+
+            <!-- ─────────────────────────────────────────────────
+                 PANEL: SCANNING / RECEIVERS FOUND
+            ───────────────────────────────────────────────────── -->
+            <LinearLayout
+                android:id="@+id/panelScanning"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:nestedScrollingEnabled="false" />
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:visibility="gone">
 
-            <!-- Discover button -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/discoverButton"
+                <!-- Radar animation area -->
+                <FrameLayout
+                    android:layout_width="140dp"
+                    android:layout_height="140dp"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="8dp">
+
+                    <!-- Outer pulse ring -->
+                    <View
+                        android:id="@+id/radarRing1"
+                        android:layout_width="140dp"
+                        android:layout_height="140dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_radar_ring"
+                        android:alpha="0.25" />
+
+                    <!-- Mid ring -->
+                    <View
+                        android:id="@+id/radarRing2"
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_radar_ring"
+                        android:alpha="0.45" />
+
+                    <!-- Inner ring / icon base -->
+                    <View
+                        android:layout_width="60dp"
+                        android:layout_height="60dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_radar_center" />
+
+                    <!-- Scan icon -->
+                    <ImageView
+                        android:layout_width="28dp"
+                        android:layout_height="28dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_radar"
+                        android:tint="@color/kg_accent"
+                        android:contentDescription="@null" />
+
+                </FrameLayout>
+
+                <!-- Scanning status -->
+                <TextView
+                    android:id="@+id/scanningTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:gravity="center"
+                    android:text="@string/label_discovering"
+                    android:textColor="@color/kg_text_primary"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_marginTop="6dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ProgressBar
+                        android:id="@+id/progressBar"
+                        style="?android:attr/progressBarStyleSmall"
+                        android:layout_width="14dp"
+                        android:layout_height="14dp"
+                        android:indeterminateTint="@color/kg_accent" />
+
+                    <TextView
+                        android:id="@+id/statusText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="@string/label_scanning_network"
+                        android:textColor="@color/kg_accent"
+                        android:textSize="12sp"
+                        android:letterSpacing="0.04" />
+
+                </LinearLayout>
+
+                <!-- Device list (populated when receivers found) -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/deviceList"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:nestedScrollingEnabled="false" />
+
+            </LinearLayout>
+
+            <!-- ─────────────────────────────────────────────────
+                 PANEL: STREAMING ACTIVE
+            ───────────────────────────────────────────────────── -->
+            <LinearLayout
+                android:id="@+id/panelStreaming"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/btn_discover" />
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center_horizontal"
+                android:visibility="gone">
 
-            <!-- Disconnect button (visible only during active streaming) -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/disconnectButton"
+                <!-- Streaming badge -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:background="@drawable/bg_pill_streaming"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="12dp"
+                    android:paddingTop="5dp"
+                    android:paddingBottom="5dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <View
+                        android:id="@+id/streamingDot"
+                        android:layout_width="8dp"
+                        android:layout_height="8dp"
+                        android:background="@drawable/bg_dot_blue" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:text="@string/status_streaming"
+                        android:textColor="@color/kg_accent"
+                        android:textSize="11sp"
+                        android:textStyle="bold"
+                        android:letterSpacing="0.1" />
+
+                </LinearLayout>
+
+                <!-- Large circular timer / status -->
+                <FrameLayout
+                    android:layout_width="200dp"
+                    android:layout_height="200dp"
+                    android:layout_marginTop="24dp"
+                    android:layout_gravity="center_horizontal">
+
+                    <View
+                        android:layout_width="200dp"
+                        android:layout_height="200dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_stream_circle_outer" />
+
+                    <View
+                        android:layout_width="160dp"
+                        android:layout_height="160dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_stream_circle_inner" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <TextView
+                            android:id="@+id/streamTimer"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="00:00"
+                            android:textColor="@color/kg_text_primary"
+                            android:textSize="36sp"
+                            android:textStyle="bold"
+                            android:letterSpacing="-0.02"
+                            tools:text="14:02" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/label_duration"
+                            android:textColor="@color/kg_text_secondary"
+                            android:textSize="11sp"
+                            android:letterSpacing="0.06" />
+
+                    </LinearLayout>
+                </FrameLayout>
+
+                <!-- Target device info -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/label_target_device"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.08"
+                    android:textAllCaps="true" />
+
+                <TextView
+                    android:id="@+id/streamTargetName"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="—"
+                    android:textColor="@color/kg_text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <!-- Stats HUD -->
+                <TextView
+                    android:id="@+id/streamStatsHud"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="11sp"
+                    android:visibility="gone"
+                    tools:text="30 FPS · 8000 kbps" />
+
+                <!-- Pause / Stop buttons -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/pauseButton"
+                    style="@style/Widget.Mirror.Button.Outlined"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="32dp"
+                    android:text="@string/btn_pause_mirroring"
+                    app:icon="@drawable/ic_pause"
+                    app:iconGravity="textStart" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/disconnectButton"
+                    style="@style/Widget.Mirror.Button.Destructive"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/btn_stop_mirroring"
+                    app:icon="@drawable/ic_stop"
+                    app:iconGravity="textStart" />
+
+            </LinearLayout>
+
+            <!-- ─────────────────────────────────────────────────
+                 PANEL: CONNECTING / AWAITING states
+            ───────────────────────────────────────────────────── -->
+            <LinearLayout
+                android:id="@+id/panelConnecting"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="@string/btn_disconnect"
-                android:visibility="gone"
-                app:backgroundTint="?attr/colorError" />
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="40dp"
+                android:visibility="gone">
 
-        </LinearLayout>
+                <ProgressBar
+                    android:id="@+id/connectingSpinner"
+                    style="@android:style/Widget.ProgressBar.Large"
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:indeterminateTint="@color/kg_accent" />
 
+                <TextView
+                    android:id="@+id/connectingLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="20dp"
+                    android:text="@string/label_connecting"
+                    android:textColor="@color/kg_text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/connectingSubLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="13sp"
+                    android:gravity="center" />
+
+            </LinearLayout>
+
+            <!-- ─────────────────────────────────────────────────
+                 PANEL: ERROR
+            ───────────────────────────────────────────────────── -->
+            <LinearLayout
+                android:id="@+id/panelError"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:padding="32dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="56dp"
+                    android:layout_height="56dp"
+                    android:src="@drawable/ic_error"
+                    android:tint="@color/kg_stop"
+                    android:contentDescription="@null" />
+
+                <TextView
+                    android:id="@+id/errorTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/error_connection_failed"
+                    android:textColor="@color/kg_text_primary"
+                    android:textSize="16sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/errorMessage"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:gravity="center"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="13sp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/retryButton"
+                    style="@style/Widget.Mirror.Button"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="24dp"
+                    android:text="@string/btn_retry" />
+
+            </LinearLayout>
+
+        </FrameLayout>
     </androidx.core.widget.NestedScrollView>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         BOTTOM NAVIGATION BAR
+    ═══════════════════════════════════════════════════════════ -->
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottomNav"
+        style="@style/Widget.Mirror.BottomNav"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        app:menu="@menu/bottom_nav_menu" />
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>
