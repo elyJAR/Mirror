@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Screen Mirror</string>
-    <string name="notification_title">Screen Mirror Active</string>
+    <string name="app_name">Mirror</string>
+    <string name="notification_title">Mirror Active</string>
     <string name="notification_text">Service is running in background</string>
     <string name="notification_text_streaming">Streaming your screen…</string>
     <string name="btn_discover">Discover Devices</string>

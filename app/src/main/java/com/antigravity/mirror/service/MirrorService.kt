@@ -169,7 +169,7 @@ class MirrorService : Service() {
             val manager = getSystemService(NotificationManager::class.java)
             if (manager.getNotificationChannel(CHANNEL_ID) == null) {
                 val channel = NotificationChannel(
-                    CHANNEL_ID, "Screen Mirror", NotificationManager.IMPORTANCE_LOW
+                    CHANNEL_ID, "Mirror", NotificationManager.IMPORTANCE_LOW
                 )
                 manager.createNotificationChannel(channel)
             }

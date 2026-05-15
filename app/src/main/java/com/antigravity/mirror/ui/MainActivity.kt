@@ -454,7 +454,7 @@ class MainActivity : AppCompatActivity() {
     private fun showSettingsDialog() {
         AlertDialog.Builder(this)
             .setTitle("Permissions Required")
-            .setMessage("Please grant permissions in the app settings to use Screen Mirror.")
+            .setMessage("Please grant permissions in the app settings to use Mirror.")
             .setPositiveButton("Settings") { _, _ ->
                 val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                     data = Uri.fromParts("package", packageName, null)
