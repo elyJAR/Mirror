@@ -69,7 +69,13 @@ class MirrorService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        return START_STICKY
+        return START_NOT_STICKY
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        super.onTaskRemoved(rootIntent)
+        Log.i(TAG, "Task removed (app swiped away), stopping service")
+        stopSelf()
     }
 
     override fun onBind(intent: Intent): IBinder = binder

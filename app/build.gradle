@@ -11,14 +11,32 @@ android {
         applicationId "com.antigravity.mirror"
         minSdk 21
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        // Use a timestamp-based versionCode to ensure updates always have a higher version
+        versionCode (System.currentTimeMillis() / 10000).toInteger()
+        versionName "1.0." + new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        debug {
+            // Using a project-level keystore if it exists ensures consistent signatures
+            // across different build environments (Local vs CI)
+            if (rootProject.file('debug.keystore').exists()) {
+                storeFile rootProject.file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
+            signingConfig signingConfigs.debug // Use debug key for easy local testing/updates
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
