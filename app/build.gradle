@@ -12,8 +12,8 @@ android {
         minSdk 21
         targetSdk 34
         // Use a timestamp-based versionCode to ensure updates always have a higher version
-        versionCode (System.currentTimeMillis() / 100000) as int
-        versionName "1.0." + new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
+        versionCode = (System.currentTimeMillis() / 100000) as int
+        versionName = "1.0." + new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
