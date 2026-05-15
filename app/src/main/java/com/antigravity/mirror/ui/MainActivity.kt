@@ -76,6 +76,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var streamTimer: TextView
     private lateinit var streamTargetName: TextView
     private lateinit var streamStatsHud: TextView
+    private lateinit var reverseControlCard: View
+    private lateinit var reverseControlStatus: TextView
+    private lateinit var reverseControlSwitch: com.google.android.material.switchmaterial.SwitchMaterial
 
     // Connecting panel
     private lateinit var connectingLabel: TextView
@@ -203,6 +206,18 @@ class MainActivity : AppCompatActivity() {
         errorMessage = findViewById(R.id.errorMessage)
         retryButton  = findViewById(R.id.retryButton)
 
+        // Reverse Control
+        reverseControlCard = findViewById(R.id.reverseControlCard)
+        reverseControlStatus = findViewById(R.id.reverseControlStatus)
+        reverseControlSwitch = findViewById(R.id.reverseControlSwitch)
+        
+        reverseControlCard.setOnClickListener {
+            if (!com.antigravity.mirror.service.InputAccessibilityService.isEnabled()) {
+                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                startActivity(intent)
+            }
+        }
+
         // Bottom nav
         bottomNav = findViewById(R.id.bottomNav)
         bottomNav.selectedItemId = R.id.nav_mirror
@@ -240,12 +255,23 @@ class MainActivity : AppCompatActivity() {
         bindService(serviceIntent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
+    override fun onResume() {
+        super.onResume()
+        updateReverseControlUI()
+    }
+
     override fun onStop() {
         super.onStop()
         if (isBound) {
             unbindService(serviceConnection)
             isBound = false
         }
+    }
+
+    private fun updateReverseControlUI() {
+        val enabled = com.antigravity.mirror.service.InputAccessibilityService.isEnabled()
+        reverseControlSwitch.isChecked = enabled
+        reverseControlStatus.text = if (enabled) "Enabled" else "Off — Tap to enable"
     }
 
     // -------------------------------------------------------------------------

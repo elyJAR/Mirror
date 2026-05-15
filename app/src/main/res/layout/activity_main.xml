@@ -505,6 +505,61 @@
                     android:visibility="gone"
                     tools:text="30 FPS · 8000 kbps" />
 
+                <!-- Reverse Control Card -->
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/reverseControlCard"
+                    style="@style/Widget.Mirror.CardView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="16dp"
+                        android:gravity="center_vertical">
+
+                        <ImageView
+                            android:id="@+id/reverseControlIcon"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:src="@drawable/ic_mouse"
+                            app:tint="@color/kg_accent" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="16dp"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Reverse Control"
+                                android:textColor="@color/kg_text_primary"
+                                android:textSize="14sp"
+                                android:textStyle="bold" />
+
+                            <TextView
+                                android:id="@+id/reverseControlStatus"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="Off — Tap to enable"
+                                android:textColor="@color/kg_text_secondary"
+                                android:textSize="12sp" />
+                        </LinearLayout>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/reverseControlSwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:clickable="false"
+                            android:focusable="false" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
                 <!-- Pause / Stop buttons -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/pauseButton"

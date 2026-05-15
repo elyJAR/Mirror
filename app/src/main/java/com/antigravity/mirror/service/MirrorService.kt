@@ -66,6 +66,21 @@ class MirrorService : Service() {
                 }
             }
         }
+
+        // Setup input injection (Reverse Control)
+        client.setInputInjector { event ->
+            InputAccessibilityService.getInstance()?.let { service ->
+                when (event) {
+                    is com.antigravity.mirror.stream.transport.TransportEvent.InjectTouch -> {
+                        service.injectTouch(event.action, event.x, event.y)
+                    }
+                    is com.antigravity.mirror.stream.transport.TransportEvent.InjectKey -> {
+                        service.injectKey(event.code)
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {

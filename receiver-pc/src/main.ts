@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { Bonjour } from 'bonjour-service';
@@ -37,10 +37,13 @@ if (!gotSingleInstanceLock) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+
 const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
 const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
-const advertisedName = `Mirror PC ${process.pid}`;
+const advertisedName = `Mirror (${os.hostname()})`;
 const trustedDevices = new Set<string>();
 
 /**
@@ -55,8 +58,12 @@ const createWindow = () => {
     minWidth: 640,
     minHeight: 360,
     title: 'Mirror Receiver',
-    autoHideMenuBar: true,
-    webPreferences: {
+    packagerConfig: {
+    asar: true,
+    extraResource: [
+      'src/assets'
+    ]
+  },  webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -68,8 +75,13 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  // Open the DevTools for development
-  // mainWindow.webContents.openDevTools();
+  // Handle window close (hide instead of quit)
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow?.hide();
+    }
+  });
 
   mainWindow.webContents.on('did-finish-load', () => {
     const ip = getLocalIpAddress();
@@ -79,7 +91,57 @@ const createWindow = () => {
   });
 
   startNetworkServices(mainWindow);
+  createTray();
 };
+
+function createTray() {
+  const refreshTray = () => {
+    const ip = getLocalIpAddress() || 'Unknown IP';
+    const iconPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'assets', 'tray-icon.png')
+      : path.join(__dirname, '..', 'src', 'assets', 'tray-icon.png');
+    
+    const icon = nativeImage.createFromPath(iconPath);
+    const trayIcon = icon.resize({ width: 16, height: 16 });
+
+    if (!tray) {
+      tray = new Tray(trayIcon);
+    } else {
+      tray.setImage(trayIcon);
+    }
+
+    const contextMenu = Menu.buildFromTemplate([
+      { label: `Mirror Receiver Active`, enabled: false },
+      { label: `Local IP: ${ip}`, enabled: false },
+      { label: 'Copy IP Address', click: () => {
+        if (ip !== 'Unknown IP') {
+          clipboard.writeText(ip);
+        }
+      }},
+      { type: 'separator' },
+      { label: 'Show Receiver', click: () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+      }},
+      { label: 'Quit Mirror', click: () => {
+        isQuitting = true;
+        app.quit();
+      }}
+    ]);
+    
+    tray.setToolTip(`Mirror Receiver\nIP: ${ip}\nStatus: Waiting for connection`);
+    tray.setContextMenu(contextMenu);
+  };
+
+  refreshTray();
+  
+  // Periodically refresh IP in case of network changes
+  setInterval(refreshTray, 10000);
+  
+  tray?.on('double-click', () => {
+    mainWindow?.show();
+  });
+}
 
 app.on('second-instance', () => {
   if (mainWindow) {
@@ -277,9 +339,8 @@ function sendControl(socket: net.Socket, msg: Record<string, unknown>) {
 app.on('ready', createWindow);
 
 app.on('window-all-closed', () => {
-  bonjour.destroy();
   if (process.platform !== 'darwin') {
-    app.quit();
+    // We stay alive in the tray
   }
 });
 
