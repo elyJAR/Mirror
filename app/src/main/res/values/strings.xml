@@ -54,5 +54,6 @@
     <string name="nav_history">History</string>
     <string name="nav_settings">Settings</string>
     <string name="nav_support">Support</string>
-    <string name="accessibility_service_description">Enables Reverse Control, allowing you to control your phone from your PC while mirroring.</string>
+    <string name="accessibility_service_name">Mirror Reverse Control</string>
+    <string name="accessibility_service_description">This service is required to relay mouse clicks and keyboard inputs from your PC to your phone while mirroring. It does not collect or share any personal data.</string>
 </resources>
