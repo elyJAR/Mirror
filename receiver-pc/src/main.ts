@@ -97,11 +97,21 @@ const createWindow = () => {
 function createTray() {
   const refreshTray = () => {
     const ip = getLocalIpAddress() || 'Unknown IP';
-    const iconPath = app.isPackaged 
-      ? path.join(process.resourcesPath, 'assets', 'tray-icon.png')
-      : path.join(__dirname, '..', 'src', 'assets', 'tray-icon.png');
     
+    let iconPath: string;
+    if (app.isPackaged) {
+      iconPath = path.join(process.resourcesPath, 'src', 'assets', 'tray-icon.png');
+    } else {
+      iconPath = path.join(app.getAppPath(), 'src', 'assets', 'tray-icon.png');
+    }
+    
+    console.log('[Tray] Creating tray with icon:', iconPath);
     const icon = nativeImage.createFromPath(iconPath);
+    
+    if (icon.isEmpty()) {
+      console.error('[Tray] Failed to load icon from path:', iconPath);
+    }
+    
     const trayIcon = icon.resize({ width: 16, height: 16 });
 
     if (!tray) {
