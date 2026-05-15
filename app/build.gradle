@@ -12,7 +12,7 @@ android {
         minSdk 21
         targetSdk 34
         // Use a timestamp-based versionCode to ensure updates always have a higher version
-        versionCode (System.currentTimeMillis() / 10000).toInteger()
+        versionCode (System.currentTimeMillis() / 100000) as int
         versionName "1.0." + new java.text.SimpleDateFormat("yyyyMMdd").format(new Date())
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
@@ -33,10 +33,14 @@ android {
 
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            if (signingConfigs.debug.storeFile != null) {
+                signingConfig signingConfigs.debug
+            }
         }
         release {
-            signingConfig signingConfigs.debug // Use debug key for easy local testing/updates
+            if (signingConfigs.debug.storeFile != null) {
+                signingConfig signingConfigs.debug
+            }
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
