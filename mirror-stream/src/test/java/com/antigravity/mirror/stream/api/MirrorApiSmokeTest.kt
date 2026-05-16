@@ -16,12 +16,13 @@ class MirrorApiSmokeTest : StringSpec({
 
     "MirrorConfig defaults match design.md §5" {
         val cfg = MirrorConfig()
-        cfg.width shouldBe 1280
-        cfg.height shouldBe 720
+        cfg.width shouldBe 1920
+        cfg.height shouldBe 1080
         cfg.fps shouldBe 30
-        cfg.bitrateBps shouldBe 8_000_000
+        cfg.bitrateBps shouldBe 12_000_000
         cfg.codec shouldBe Codec.H264_BASELINE
         cfg.transport shouldBe TransportPreference.AUTO
+        cfg.latencyMode shouldBe LatencyMode.BALANCED
     }
 
     "MirrorState.Idle is a singleton" {
