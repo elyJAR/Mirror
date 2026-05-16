@@ -5,7 +5,7 @@
  * 
  * Requirements: tasks.md §4.3
  */
-import { IAudioData, IAudioDecoder } from './interface';
+import type { IAudioData, IAudioDecoder } from './interface';
 
 const statusEl = document.getElementById('status') as HTMLElement;
 const peerEl = document.getElementById('peer') as HTMLElement;
@@ -43,7 +43,6 @@ window.addEventListener('keydown', (e) => {
 let decoder: VideoDecoder | null = null;
 let audioDecoder: IAudioDecoder | null = null;
 let audioCtx: AudioContext | null = null;
-let nextAudioTime = 0;
 let inputEnabled = false;
 
 let isConfigured = false;
@@ -52,13 +51,35 @@ let bytesReceived = 0;
 let lastStatsTime = Date.now();
 let baseAndroidTs: number | null = null;
 let baseAudioContextTime = 0;
-const SYNC_DELAY_US = 150000; // 150ms buffer for sync
+const SYNC_DELAY_US = 80000; // 80ms buffer for sync (reduced from 150ms)
 
 function getPlaybackTime(ts: number): number {
-  if (baseAndroidTs === null || !audioCtx) {
+  if (!audioCtx) return 0;
+  
+  if (baseAndroidTs === null) {
     baseAndroidTs = ts;
-    baseAudioContextTime = (audioCtx?.currentTime || 0) + SYNC_DELAY_US / 1000000;
+    baseAudioContextTime = audioCtx.currentTime + SYNC_DELAY_US / 1000000;
+    return baseAudioContextTime;
   }
+
+  const rawTargetTime = baseAudioContextTime + (ts - baseAndroidTs) / 1000000;
+  const drift = rawTargetTime - (audioCtx.currentTime + SYNC_DELAY_US / 1000000);
+
+  // If drift is more than 20ms, slowly nudge the base to catch up/slow down.
+  // We adjust by 1ms for every frame, which is subtle enough to avoid pitch shifts.
+  if (Math.abs(drift) > 0.020) {
+    const adjustment = drift > 0 ? -0.001 : 0.001;
+    baseAudioContextTime += adjustment;
+  }
+  
+  // If drift is extreme (>500ms), do a hard reset to recover immediately.
+  if (Math.abs(drift) > 0.500) {
+    console.warn(`Extreme drift detected (${(drift * 1000).toFixed(0)}ms), resetting sync base.`);
+    baseAndroidTs = ts;
+    baseAudioContextTime = audioCtx.currentTime + SYNC_DELAY_US / 1000000;
+    return baseAudioContextTime;
+  }
+
   return baseAudioContextTime + (ts - baseAndroidTs) / 1000000;
 }
 
@@ -71,9 +92,10 @@ function initDecoder() {
     output: (frame) => {
       const targetTime = getPlaybackTime(frame.timestamp || 0);
       const now = audioCtx?.currentTime || 0;
-      const delayMs = Math.max(0, (targetTime - now) * 1000);
+      const delayMs = (targetTime - now) * 1000;
 
-      setTimeout(() => {
+      if (delayMs <= 5) {
+        // Render immediately if delay is tiny (under 5ms)
         if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
           canvas.width = frame.displayWidth;
           canvas.height = frame.displayHeight;
@@ -81,7 +103,17 @@ function initDecoder() {
         ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
         frame.close();
         frameCount++;
-      }, delayMs);
+      } else {
+        setTimeout(() => {
+          if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
+            canvas.width = frame.displayWidth;
+            canvas.height = frame.displayHeight;
+          }
+          ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+          frame.close();
+          frameCount++;
+        }, delayMs);
+      }
     },
     error: (e: Error) => {
       console.error('VideoDecoder error:', e);
@@ -277,7 +309,13 @@ setInterval(() => {
   if (elapsed >= 1) {
     const fps = Math.round(frameCount / elapsed);
     const kbps = Math.round((bytesReceived * 8) / (1000 * elapsed));
+    
+    // Calculate current A/V drift for debugging (optional)
+    // const now = audioCtx?.currentTime || 0;
+    // const lastFrameTs = baseAndroidTs ? (baseAndroidTs + (now - baseAudioContextTime) * 1000000) : 0;
+    
     statsEl.textContent = `${fps} FPS / ${kbps} kbps`;
+    // console.log(`A/V Sync: delay=${SYNC_DELAY_US}us, currentTime=${now.toFixed(3)}`);
     frameCount = 0;
     bytesReceived = 0;
     lastStatsTime = now;

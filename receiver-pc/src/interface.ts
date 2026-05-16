@@ -1,7 +1,7 @@
 export interface IElectronAPI {
   onControlMessage: (callback: (msg: Record<string, unknown>) => void) => void;
-  onVideoFrame: (callback: (frame: Uint8Array) => void) => void;
-  onAudioFrame: (callback: (frame: Uint8Array) => void) => void;
+  onVideoFrame: (callback: (frame: Uint8Array, timestamp: number) => void) => void;
+  onAudioFrame: (callback: (frame: Uint8Array, timestamp: number) => void) => void;
   onPeerConnected: (callback: (peer: { address: string }) => void) => void;
   onPeerDisconnected: (callback: () => void) => void;
   onPairingPin: (callback: (pin: string) => void) => void;
@@ -18,6 +18,7 @@ export interface IAudioData {
   numberOfChannels: number;
   numberOfFrames: number;
   sampleRate: number;
+  timestamp: number;
   copyTo: (dest: Float32Array, options: { planeIndex: number }) => void;
   close: () => void;
 }
