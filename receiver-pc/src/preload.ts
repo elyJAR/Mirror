@@ -31,6 +31,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onProjectionState: (callback: (isProjecting: boolean) => void) =>
     ipcRenderer.on('projection-state', (_event, value) => callback(value)),
 
+  onSyncState: (callback: (state: any) => void) =>
+    ipcRenderer.on('sync-state', (_event, value) => callback(value)),
+
   // Actions to send to Main process
   sendControl: (msg: any) => ipcRenderer.invoke('send-control', msg),
   projectToExtended: () => ipcRenderer.invoke('project-to-extended'),

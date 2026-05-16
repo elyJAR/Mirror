@@ -95,9 +95,10 @@
         <div style="font-size: 14px; color: #555;">Waiting for connection...</div>
     </div>
     <div id="debug-logs"></div>
-    <div id="hud">
-      <span id="peer">No Peer</span> | 
-      <span id="stats">0 FPS / 0 kbps</span>
+    <div id="hud" style="display: flex; align-items: center; gap: 10px;">
+        <button id="btnRefresh" style="background: rgba(255,255,255,0.1); border: 1px solid #444; color: #888; cursor: pointer; padding: 2px 8px; border-radius: 4px; font-size: 10px;">Refresh</button>
+        <span id="peer">No Peer</span> | 
+        <span id="stats">0 FPS / 0 kbps</span>
     </div>
     <script type="module" src="./src/renderer.ts"></script>
   </body>

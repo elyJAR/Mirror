@@ -47,6 +47,15 @@ let activeSocket: net.Socket | null = null;
 let currentPin = '';
 const advertisedName = `Mirror (${os.hostname()})`;
 const trustedDevices = new Set<string>();
+
+function broadcastSyncState() {
+  broadcastToWindows('sync-state', {
+    currentPin,
+    currentPeer,
+    isPaired,
+    lastHelloMsg
+  });
+}
 let lastConfigFrame: Buffer | null = null;
 let lastHelloMsg: any = null;
 let currentPeer: string | null = null;
@@ -212,8 +221,7 @@ function startNetworkServices(window: BrowserWindow) {
     console.log('New connection from', remoteAddress, 'PIN:', currentPin);
     
     refreshTray();
-    broadcastToWindows('peer-connected', { address: currentPeer });
-    broadcastToWindows('pairing-pin', currentPin);
+    broadcastSyncState();
     
     let buffer = Buffer.alloc(0);
     let pinAttempts = 0;
@@ -262,7 +270,7 @@ function startNetworkServices(window: BrowserWindow) {
       lastConfigFrame = null;
       lastHelloMsg = null;
       refreshTray();
-      broadcastToWindows('peer-disconnected');
+      broadcastSyncState();
     });
 
     socket.on('error', (err) => {
@@ -332,7 +340,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         
         if (isTrusted) {
           isPaired = true;
-          broadcastToWindows('pairing-success');
+          broadcastSyncState();
         }
       } else if (inferredType === 'verify-pin') {
         const isMatch = msg.pin === currentPin;
@@ -347,7 +355,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           isPaired = true;
           currentPin = '';
           refreshTray();
-          broadcastToWindows('pairing-success');
+          broadcastSyncState();
         } else {
           if (onPinFailure()) {
             return false; // Signal to disconnect
