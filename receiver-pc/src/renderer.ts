@@ -189,7 +189,7 @@ window.electronAPI.onAudioFrame((payload: Uint8Array) => {
     return;
   }
 
-  const chunk = new EncodedAudioChunk({
+  const chunk = new window.EncodedAudioChunk({
     type: 'key',
     timestamp: performance.now() * 1000,
     data: payload,
