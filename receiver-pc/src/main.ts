@@ -38,7 +38,7 @@ if (!gotSingleInstanceLock) {
 
 let mainWindow: BrowserWindow | null = null;
 let projectionWindow: BrowserWindow | null = null;
-let lastSessionParams: any = null;
+let lastSessionParams: Record<string, unknown> | null = null;
 let currentPeerAddress: string | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;

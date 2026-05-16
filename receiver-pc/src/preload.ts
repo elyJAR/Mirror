@@ -34,11 +34,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onProjectionState: (callback: (isProjecting: boolean) => void) =>
     ipcRenderer.on('projection-state', (_, value) => callback(value)),
 
-  onSyncState: (callback: (state: any) => void) =>
+  onSyncState: (callback: (state: unknown) => void) =>
     ipcRenderer.on('sync-state', (_, value) => callback(value)),
 
   // Actions to send to Main process
-  sendControl: (msg: any) => ipcRenderer.invoke('send-control', msg),
+  sendControl: (msg: Record<string, unknown>) => ipcRenderer.invoke('send-control', msg),
   projectToExtended: () => ipcRenderer.invoke('project-to-extended'),
   getPairingState: () => ipcRenderer.invoke('get-pairing-state'),
 });
