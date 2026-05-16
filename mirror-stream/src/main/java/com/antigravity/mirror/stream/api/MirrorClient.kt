@@ -371,6 +371,10 @@ class MirrorClient(context: Context) {
         )
     }
 
+    private fun handleControlMessage(msg: ControlMessage) {
+        scope.launch { _controlMessages.emit(msg) }
+    }
+
     private fun handleCongestion(stats: SessionStats) {
         if (stats.queueDepth > 15) {
             if (highQueueStartTime == 0L) highQueueStartTime = System.currentTimeMillis()
