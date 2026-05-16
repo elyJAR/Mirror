@@ -58,12 +58,7 @@ const createWindow = () => {
     minWidth: 640,
     minHeight: 360,
     title: 'Mirror Receiver',
-    packagerConfig: {
-    asar: true,
-    extraResource: [
-      'src/assets'
-    ]
-  },  webPreferences: {
+    webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -98,18 +93,29 @@ function createTray() {
   const refreshTray = () => {
     const ip = getLocalIpAddress() || 'Unknown IP';
     
-    let iconPath: string;
-    if (app.isPackaged) {
-      iconPath = path.join(process.resourcesPath, 'src', 'assets', 'tray-icon.png');
-    } else {
-      iconPath = path.join(app.getAppPath(), 'src', 'assets', 'tray-icon.png');
+    console.log('[Tray] Creating tray. Searching for icon...');
+    
+    const possiblePaths = [
+      path.join(app.getAppPath(), 'src', 'assets', 'tray-icon.png'),
+      path.join(process.resourcesPath, 'src', 'assets', 'tray-icon.png'),
+      path.join(process.resourcesPath, 'assets', 'tray-icon.png'),
+      path.join(__dirname, '..', 'src', 'assets', 'tray-icon.png')
+    ];
+
+    let icon = nativeImage.createEmpty();
+    for (const p of possiblePaths) {
+      const img = nativeImage.createFromPath(p);
+      if (!img.isEmpty()) {
+        console.log('[Tray] Found icon at:', p);
+        icon = img;
+        break;
+      }
     }
     
-    console.log('[Tray] Creating tray with icon:', iconPath);
-    const icon = nativeImage.createFromPath(iconPath);
-    
     if (icon.isEmpty()) {
-      console.error('[Tray] Failed to load icon from path:', iconPath);
+      console.warn('[Tray] All icon paths failed. Using colored fallback.');
+      // Fallback: A bright blue circle (base64) to ensure visibility
+      icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXcF5yXzUAAABWSURBVBgZ7c6xCQAgDMTAs99fT8AhfIuC/+78EFEuX993LidIAYJFAAAAABJRU5ErkJggg==');
     }
     
     const trayIcon = icon.resize({ width: 16, height: 16 });

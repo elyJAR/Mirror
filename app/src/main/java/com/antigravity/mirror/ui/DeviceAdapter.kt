@@ -7,61 +7,101 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.antigravity.mirror.R
 import com.antigravity.mirror.stream.api.Receiver
+import com.antigravity.mirror.stream.transport.TransportId
 
 /**
- * RecyclerView adapter that displays a list of discovered screen mirror receivers.
- *
- * Each item shows the receiver name and its host address/port.
- * Tapping an item invokes [onDeviceClick].
- *
- * Requirements: 6.1, 6.2
+ * RecyclerView adapter that displays a categorized list of discovered screen mirror receivers.
  */
 class DeviceAdapter(
-    private var devices: List<Receiver>,
+    private var rawDevices: List<Receiver>,
     private val onDeviceClick: (Receiver) -> Unit
-) : RecyclerView.Adapter<DeviceAdapter.DeviceViewHolder>() {
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+
+    private sealed class ListItem {
+        data class Header(val title: String) : ListItem()
+        data class Device(val receiver: Receiver) : ListItem()
+    }
+
+    private var items: List<ListItem> = emptyList()
+
+    init {
+        rebuildItems()
+    }
+
+    private fun rebuildItems() {
+        val newItems = mutableListOf<ListItem>()
+        
+        // Group 1: Miracast (Direct)
+        val miracast = rawDevices.filter { it.transportId == TransportId.MIRACAST }
+        if (miracast.isNotEmpty()) {
+            newItems.add(ListItem.Header("Direct Connect (Wireless Display)"))
+            newItems.addAll(miracast.map { ListItem.Device(it) })
+        }
+
+        // Group 2: LAN (Nearby)
+        val lan = rawDevices.filter { it.transportId == TransportId.LAN }
+        if (lan.isNotEmpty()) {
+            newItems.add(ListItem.Header("Nearby Displays (Local Network / LAN)"))
+            newItems.addAll(lan.map { ListItem.Device(it) })
+        }
+
+        items = newItems
+    }
 
     // -------------------------------------------------------------------------
-    // ViewHolder
+    // ViewHolders
     // -------------------------------------------------------------------------
 
-    inner class DeviceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        val deviceName: TextView = itemView.findViewById(R.id.deviceName)
-        val deviceAddress: TextView = itemView.findViewById(R.id.deviceAddress)
-        val connectButton: View = itemView.findViewById(R.id.connectButton)
+    class HeaderViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val title: TextView = view.findViewById(R.id.headerTitle)
+    }
+
+    class DeviceViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+        val deviceName: TextView = view.findViewById(R.id.deviceName)
+        val deviceAddress: TextView = view.findViewById(R.id.deviceAddress)
+        val connectButton: View = view.findViewById(R.id.connectButton)
     }
 
     // -------------------------------------------------------------------------
     // Adapter overrides
     // -------------------------------------------------------------------------
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): DeviceViewHolder {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_device, parent, false)
-        return DeviceViewHolder(view)
+    override fun getItemViewType(position: Int): Int {
+        return when (items[position]) {
+            is ListItem.Header -> 0
+            is ListItem.Device -> 1
+        }
     }
 
-    override fun onBindViewHolder(holder: DeviceViewHolder, position: Int) {
-        val device = devices[position]
-        holder.deviceName.text = device.name.ifBlank { "Unknown Receiver" }
-        holder.deviceAddress.text = "${device.host}:${device.port} (${device.transportId})"
-        holder.itemView.setOnClickListener { onDeviceClick(device) }
-        holder.connectButton.setOnClickListener { onDeviceClick(device) }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        val inflater = LayoutInflater.from(parent.context)
+        return when (viewType) {
+            0 -> HeaderViewHolder(inflater.inflate(R.layout.item_header, parent, false))
+            else -> DeviceViewHolder(inflater.inflate(R.layout.item_device, parent, false))
+        }
     }
 
-    override fun getItemCount(): Int = devices.size
+    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+        when (val item = items[position]) {
+            is ListItem.Header -> {
+                (holder as HeaderViewHolder).title.text = item.title
+            }
+            is ListItem.Device -> {
+                val h = holder as DeviceViewHolder
+                val device = item.receiver
+                h.deviceName.text = device.name.ifBlank { "Unknown Receiver" }
+                h.deviceAddress.text = "${device.host}:${device.port}"
+                h.itemView.setOnClickListener { onDeviceClick(device) }
+                h.connectButton.setOnClickListener { onDeviceClick(device) }
+            }
+        }
+    }
 
-    // -------------------------------------------------------------------------
-    // Data update
-    // -------------------------------------------------------------------------
+    override fun getItemCount(): Int = items.size
 
-    /**
-     * Replaces the current receiver list and refreshes the RecyclerView.
-     *
-     * @param newDevices The updated list of discovered [Receiver] peers.
-     */
     fun updateDevices(newDevices: List<Receiver>) {
-        devices = newDevices
+        rawDevices = newDevices
+        rebuildItems()
         notifyDataSetChanged()
     }
 }

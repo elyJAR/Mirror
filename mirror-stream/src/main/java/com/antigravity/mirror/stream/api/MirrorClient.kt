@@ -90,17 +90,19 @@ class MirrorClient(context: Context) {
         discoveryJob = scope.launch {
             // Combine discovery results from all available transports
             val discoveryFlows = transports.values.map { transport ->
-                transport.startDiscovery().map { targets ->
-                    targets.map { target ->
-                        val receiver = Receiver(
-                            name = target.name,
-                            host = target.host,
-                            port = target.port,
-                            transportId = target.transportId
-                        )
-                        receiver to target
+                transport.startDiscovery()
+                    .onStart { emit(emptyList()) } // Ensure combine doesn't wait for the first scan
+                    .map { targets ->
+                        targets.map { target ->
+                            val receiver = Receiver(
+                                name = target.name,
+                                host = target.host,
+                                port = target.port,
+                                transportId = target.transportId
+                            )
+                            receiver to target
+                        }
                     }
-                }
             }
 
             combine(discoveryFlows) { lists ->
