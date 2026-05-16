@@ -71,6 +71,7 @@ let isConfigured = false;
 let frameCount = 0;
 let bytesReceived = 0;
 let lastStatsTime = Date.now();
+let audioDebugCount = 0;
 
 function initDecoder() {
   if (decoder) {
@@ -160,7 +161,17 @@ window.addEventListener('click', () => {
 
 // ...
 window.electronAPI.onAudioFrame((payload: Uint8Array) => {
-  if (!audioDecoder || audioDecoder.state === 'closed') return;
+  if (audioDebugCount++ % 50 === 0) {
+    console.log(`Audio frame received in renderer: ${payload.length} bytes`);
+  }
+  
+  if (!audioDecoder || audioDecoder.state === 'closed') {
+    // If we have frames but no decoder, try a late-init (might still need user gesture)
+    if (audioDebugCount % 100 === 0) {
+        console.warn('Audio frame received but decoder not ready. User click might be required.');
+    }
+    return;
+  }
 
   const chunk = new EncodedAudioChunk({
     type: 'key',

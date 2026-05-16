@@ -61,6 +61,7 @@ function broadcastSyncState() {
 let lastConfigFrame: Buffer | null = null;
 let lastHelloMsg: any = null;
 let debugFrameCount = 0;
+let audioDebugCount = 0;
 
 /**
  * Main application window setup.
@@ -405,7 +406,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
     }
     broadcastToWindows('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
-    if (debugFrameCount % 100 === 0) {
+    if (audioDebugCount++ % 20 === 0) {
       console.log(`Audio frame received: ${payload.length} bytes`);
     }
     broadcastToWindows('audio-frame', payload);
