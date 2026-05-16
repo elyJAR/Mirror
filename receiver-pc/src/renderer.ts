@@ -170,6 +170,22 @@ statusEl.textContent = 'Waiting for phone...';
 statusEl.style.display = 'block';
 hudEl.style.display = 'block';
 
+// Fetch initial state
+window.electronAPI.getPairingState().then((state: any) => {
+  if (state.currentPin) {
+    console.log('Fetched initial PIN:', state.currentPin);
+    pinEl.textContent = state.currentPin;
+    pairingEl.style.display = 'block';
+  }
+  if (state.currentPeer) {
+    peerEl.textContent = state.currentPeer;
+  }
+  if (state.isPaired) {
+    pairingEl.style.display = 'none';
+    inputEnabled = true;
+  }
+});
+
 // --- IPC Event Handlers ---
 
 window.electronAPI.onLocalIp((ip) => {

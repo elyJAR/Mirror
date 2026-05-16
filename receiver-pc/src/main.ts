@@ -429,6 +429,15 @@ function cleanup() {
   ipcMain.removeHandler('send-control');
 }
 
+ipcMain.handle('get-pairing-state', () => {
+  return {
+    currentPin,
+    currentPeer,
+    isPaired,
+    lastHelloMsg
+  };
+});
+
 ipcMain.handle('project-to-extended', () => {
   if (projectionWindow) {
     projectionWindow.close();
