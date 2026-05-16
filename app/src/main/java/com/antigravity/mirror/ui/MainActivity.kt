@@ -221,6 +221,13 @@ class MainActivity : AppCompatActivity() {
                 startActivity(intent)
             }
         }
+        
+        reverseControlSwitch.setOnCheckedChangeListener { _, _ ->
+            // Re-sync switch state and open settings if toggled
+            updateReverseControlUI()
+            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+            startActivity(intent)
+        }
 
         // Bottom nav
         bottomNav = findViewById(R.id.bottomNav)

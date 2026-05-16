@@ -46,6 +46,10 @@ let tcpServer: net.Server | null = null;
 let currentPin = '';
 const advertisedName = `Mirror (${os.hostname()})`;
 const trustedDevices = new Set<string>();
+let lastConfigFrame: Buffer | null = null;
+let lastHelloMsg: any = null;
+let currentPeer: string | null = null;
+let isPaired = false;
 
 /**
  * Main application window setup.
@@ -84,8 +88,20 @@ const createWindow = () => {
     if (ip) {
       mainWindow?.webContents.send('local-ip', `${ip}:8765`);
     }
+    if (currentPeer) {
+      mainWindow?.webContents.send('peer-connected', { address: currentPeer });
+    }
+    if (lastHelloMsg) {
+      mainWindow?.webContents.send('control-message', lastHelloMsg);
+    }
     if (currentPin) {
       mainWindow?.webContents.send('pairing-pin', currentPin);
+    }
+    if (isPaired) {
+      mainWindow?.webContents.send('pairing-success');
+    }
+    if (lastConfigFrame) {
+      mainWindow?.webContents.send('video-frame', lastConfigFrame);
     }
   });
 
@@ -184,10 +200,14 @@ function startNetworkServices(window: BrowserWindow) {
     
     // Generate fresh PIN and notify all windows
     currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+    currentPeer = remoteAddress || 'unknown';
+    isPaired = false;
+    lastConfigFrame = null;
+    lastHelloMsg = null;
     console.log('New connection from', remoteAddress, 'PIN:', currentPin);
     
     refreshTray();
-    broadcastToWindows('peer-connected', { address: remoteAddress });
+    broadcastToWindows('peer-connected', { address: currentPeer });
     broadcastToWindows('pairing-pin', currentPin);
     
     let buffer = Buffer.alloc(0);
@@ -241,6 +261,10 @@ function startNetworkServices(window: BrowserWindow) {
     socket.on('close', () => {
       console.log('Phone disconnected');
       currentPin = '';
+      currentPeer = null;
+      isPaired = false;
+      lastConfigFrame = null;
+      lastHelloMsg = null;
       refreshTray();
       broadcastToWindows('peer-disconnected');
       ipcMain.removeHandler('send-control'); // Cleanup handler
@@ -294,6 +318,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
       
+      lastHelloMsg = msg;
       broadcastToWindows('control-message', msg);
       
       // Automatic handshake response
@@ -311,6 +336,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         });
         
         if (isTrusted) {
+          isPaired = true;
           broadcastToWindows('pairing-success');
         }
       } else if (inferredType === 'verify-pin') {
@@ -323,6 +349,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         
         if (isMatch) {
           trustedDevices.add(socket.remoteAddress || 'unknown');
+          isPaired = true;
           currentPin = '';
           refreshTray();
           broadcastToWindows('pairing-success');
@@ -341,6 +368,19 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
       console.error('Failed to parse control message:', e);
     }
   } else if (tag === 0x02) { // Video NAL Unit
+    // Detect if this is a config frame (SPS/PPS/VPS)
+    let nalOffset = 0;
+    if (payload.length >= 4 && payload[0] === 0 && payload[1] === 0 && payload[2] === 0 && payload[3] === 1) nalOffset = 4;
+    else if (payload.length >= 3 && payload[0] === 0 && payload[1] === 0 && payload[2] === 1) nalOffset = 3;
+    
+    const firstByte = payload[nalOffset];
+    const nalType = firstByte & 0x1F;
+    const hevcType = (firstByte >> 1) & 0x3F;
+    const isConfig = (nalType === 7) || (hevcType === 32 || hevcType === 33);
+    
+    if (isConfig) {
+      lastConfigFrame = payload;
+    }
     broadcastToWindows('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
     broadcastToWindows('audio-frame', payload);
@@ -421,6 +461,14 @@ ipcMain.handle('project-to-extended', () => {
     projectionWindow.on('closed', () => {
       projectionWindow = null;
       mainWindow?.webContents.send('projection-state', false);
+    });
+
+    projectionWindow.webContents.on('did-finish-load', () => {
+      if (currentPeer) projectionWindow?.webContents.send('peer-connected', { address: currentPeer });
+      if (lastHelloMsg) projectionWindow?.webContents.send('control-message', lastHelloMsg);
+      if (currentPin) projectionWindow?.webContents.send('pairing-pin', currentPin);
+      if (isPaired) projectionWindow?.webContents.send('pairing-success');
+      if (lastConfigFrame) projectionWindow?.webContents.send('video-frame', lastConfigFrame);
     });
 
     projectionWindow.webContents.on('did-finish-load', () => {

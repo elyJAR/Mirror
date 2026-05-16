@@ -167,6 +167,8 @@ window.electronAPI.onAudioFrame((payload: Uint8Array) => {
 // Initial setup
 initDecoder();
 statusEl.textContent = 'Waiting for phone...';
+statusEl.style.display = 'block';
+hudEl.style.display = 'block';
 
 // --- IPC Event Handlers ---
 
