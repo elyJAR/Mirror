@@ -14,14 +14,29 @@ export interface IElectronAPI {
   getPairingState: () => Promise<unknown>;
 }
 
+export interface IAudioData {
+  numberOfChannels: number;
+  numberOfFrames: number;
+  sampleRate: number;
+  copyTo: (dest: Float32Array, options: { planeIndex: number }) => void;
+  close: () => void;
+}
+
+export interface IAudioDecoder {
+  decode: (chunk: unknown) => void;
+  close: () => void;
+  state: string;
+  configure: (config: { codec: string; sampleRate: number; numberOfChannels: number; description?: Uint8Array }) => void;
+}
+
 declare global {
   interface Window {
     electronAPI: IElectronAPI;
     AudioDecoder: {
       new (init: {
-        output: (data: unknown) => void;
+        output: (data: IAudioData) => void;
         error: (e: Error) => void;
-      }): unknown;
+      }): IAudioDecoder;
       isConfigSupported(config: unknown): Promise<unknown>;
     };
     EncodedAudioChunk: {

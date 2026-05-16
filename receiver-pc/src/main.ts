@@ -186,11 +186,11 @@ function startNetworkServices(window: BrowserWindow) {
       },
     });
 
-    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-      projectionWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
-    } else {
-      projectionWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
-    }
+    const url = MAIN_WINDOW_VITE_DEV_SERVER_URL
+      ? `${MAIN_WINDOW_VITE_DEV_SERVER_URL}?mode=projection`
+      : `file://${path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)}?mode=projection`;
+
+    projectionWindow.loadURL(url);
 
     projectionWindow.on('closed', () => {
       projectionWindow = null;

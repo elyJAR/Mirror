@@ -5,6 +5,7 @@
  * 
  * Requirements: tasks.md §4.3
  */
+import { IAudioData, IAudioDecoder } from './interface';
 
 const statusEl = document.getElementById('status') as HTMLElement;
 const peerEl = document.getElementById('peer') as HTMLElement;
@@ -18,6 +19,17 @@ const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
 const audioStatusEl = document.getElementById('audio-status') as HTMLElement;
 
 let hudVisible = false;
+const isProjectionMode = new URLSearchParams(window.location.search).get('mode') === 'projection';
+
+if (isProjectionMode) {
+  pairingEl.style.display = 'none';
+  hudEl.style.display = 'none';
+  statusEl.style.display = 'none';
+  const controls = document.getElementById('controls');
+  if (controls) controls.style.display = 'none';
+  const logs = document.getElementById('debug-logs');
+  if (logs) logs.style.display = 'none';
+}
 
 window.addEventListener('keydown', (e) => {
   if (e.ctrlKey && e.key === 'h') {
@@ -29,19 +41,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 let decoder: VideoDecoder | null = null;
-interface AudioData {
-  numberOfChannels: number;
-  numberOfFrames: number;
-  sampleRate: number;
-  copyTo: (dest: Float32Array, options: { planeIndex: number }) => void;
-  close: () => void;
-}
-let audioDecoder: { 
-  decode: (chunk: { type: string; timestamp: number; data: Uint8Array }) => void; 
-  close: () => void; 
-  state: string; 
-  configure: (config: { codec: string; sampleRate: number; numberOfChannels: number; description?: Uint8Array }) => void 
-} | null = null;
+let audioDecoder: IAudioDecoder | null = null;
 let audioCtx: AudioContext | null = null;
 let nextAudioTime = 0;
 let inputEnabled = false;
@@ -88,7 +88,7 @@ function initAudio() {
   }
 
   audioDecoder = new window.AudioDecoder({
-    output: (data: AudioData) => {
+    output: (data: IAudioData) => {
       if (!audioCtx) return;
 
       const buffer = audioCtx.createBuffer(
