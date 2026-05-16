@@ -224,15 +224,13 @@ class MainActivity : AppCompatActivity() {
         extendDisplayStatus = findViewById(R.id.extendDisplayStatus)
 
         extendDisplayCard.setOnClickListener {
-            Log.d(TAG, "extendDisplayCard clicked. mirrorService state: ${mirrorService != null}")
             if (mirrorService != null) {
                 try {
-                    Log.d(TAG, "Calling mirrorService.toggleProjection()")
                     mirrorService?.toggleProjection()
                     Toast.makeText(this, "Requesting PC projection...", Toast.LENGTH_SHORT).show()
                     extendDisplayStatus.text = "Request sent to PC"
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error sending ExtendDisplayMessage: ${e.message}", e)
+                    Log.e(TAG, "Error sending projection request: ${e.message}", e)
                     Toast.makeText(this, "Failed to send request: ${e.message}", Toast.LENGTH_SHORT).show()
                 }
             } else {

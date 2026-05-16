@@ -74,24 +74,12 @@ class MirrorClient(context: Context) {
 
     /** Send a control message to the active session. */
     fun sendControl(message: ControlMessage) {
-        val session = activeSession
-        if (session == null) {
-            Log.w(TAG, "sendControl called but activeSession is null!")
-        } else {
-            Log.d(TAG, "Forwarding control message to active session: ${message::class.simpleName}")
-            session.sendControl(message)
-        }
+        activeSession?.sendControl(message)
     }
 
     /** Request the PC to toggle the secondary projection window. */
     fun toggleRemoteProjection() {
-        val session = activeSession
-        if (session == null) {
-            Log.w(TAG, "toggleRemoteProjection called but activeSession is null!")
-        } else {
-            Log.d(TAG, "Requesting remote projection toggle")
-            session.toggleProjection()
-        }
+        activeSession?.toggleProjection()
     }
 
     private var discoveryJob: Job? = null

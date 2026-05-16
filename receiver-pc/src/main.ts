@@ -346,15 +346,12 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
   if (tag === 0x01) { // Control Message (JSON)
     try {
       const raw = payload.toString().trim();
-      console.log('[TCP] Raw control payload:', raw);
       const msg = JSON.parse(raw);
       
       const inferredType =
         typeof msg.type === 'string'
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
-      
-      console.log('Control Message Inferred Type:', inferredType);
       
       if (mainWindow) mainWindow.webContents.send('control-message', msg);
       if (projectionWindow) projectionWindow.webContents.send('control-message', msg);
