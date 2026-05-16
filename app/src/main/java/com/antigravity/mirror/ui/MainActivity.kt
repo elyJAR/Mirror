@@ -223,7 +223,13 @@ class MainActivity : AppCompatActivity() {
         extendDisplayStatus = findViewById(R.id.extendDisplayStatus)
 
         extendDisplayCard.setOnClickListener {
-            mirrorService?.sendControl(com.antigravity.mirror.stream.transport.lan.protocol.ExtendDisplayMessage())
+            if (mirrorService != null) {
+                mirrorService?.sendControl(com.antigravity.mirror.stream.transport.lan.protocol.ExtendDisplayMessage())
+                Toast.makeText(this, "Requesting PC projection...", Toast.LENGTH_SHORT).show()
+                extendDisplayStatus.text = "Request sent to PC"
+            } else {
+                Toast.makeText(this, "Service not ready", Toast.LENGTH_SHORT).show()
+            }
         }
         
         reverseControlCard.setOnClickListener {

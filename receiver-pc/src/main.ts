@@ -37,6 +37,7 @@ if (!gotSingleInstanceLock) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let projectionWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -154,8 +155,13 @@ function startNetworkServices(window: BrowserWindow) {
   if (tcpServer) return;
 
   const toggleProjection = async () => {
-    if (!mainWindow) return false;
-    
+    if (projectionWindow) {
+      projectionWindow.close();
+      projectionWindow = null;
+      if (mainWindow) mainWindow.webContents.send('projection-state', false);
+      return false;
+    }
+
     const displays = screen.getAllDisplays();
     if (displays.length < 2) {
       console.log('No extended display found');
@@ -165,19 +171,34 @@ function startNetworkServices(window: BrowserWindow) {
     const primaryDisplay = screen.getPrimaryDisplay();
     const extendedDisplay = displays.find((d: Electron.Display) => d.id !== primaryDisplay.id) || displays[1];
 
-    if (mainWindow.getBounds().x !== primaryDisplay.bounds.x) {
-      // Move back to primary
-      mainWindow.setBounds(primaryDisplay.bounds);
-      mainWindow.setFullScreen(false);
-      mainWindow.webContents.send('projection-state', false);
-      return false;
+    console.log('Opening projection window on display:', extendedDisplay.id);
+
+    projectionWindow = new BrowserWindow({
+      x: extendedDisplay.bounds.x,
+      y: extendedDisplay.bounds.y,
+      width: extendedDisplay.bounds.width,
+      height: extendedDisplay.bounds.height,
+      fullscreen: true,
+      autoHideMenuBar: true,
+      title: 'Mirror Projection',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+      },
+    });
+
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+      projectionWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
     } else {
-      // Move to extended
-      mainWindow.setBounds(extendedDisplay.bounds);
-      mainWindow.setFullScreen(true);
-      mainWindow.webContents.send('projection-state', true);
-      return true;
+      projectionWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
     }
+
+    projectionWindow.on('closed', () => {
+      projectionWindow = null;
+      if (mainWindow) mainWindow.webContents.send('projection-state', false);
+    });
+
+    if (mainWindow) mainWindow.webContents.send('projection-state', true);
+    return true;
   };
 
   ipcMain.handle('project-to-extended', toggleProjection);
@@ -282,6 +303,9 @@ function startNetworkServices(window: BrowserWindow) {
 }
 
 function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: BrowserWindow, onToggleProjection: () => void, onPinFailure: () => boolean): boolean {
+  if (tag !== 0x02 && tag !== 0x03) {
+    console.log(`[TCP] Received frame tag: 0x${tag.toString(16)}, size: ${payload.length}`);
+  }
   if (tag === 0x01) { // Control Message (JSON)
     try {
       const raw = payload.toString();
@@ -292,7 +316,10 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
       
-      window.webContents.send('control-message', msg);
+      console.log('Control Message:', inferredType, msg);
+      
+      if (mainWindow) mainWindow.webContents.send('control-message', msg);
+      if (projectionWindow) projectionWindow.webContents.send('control-message', msg);
       
       // Automatic handshake response
       if (inferredType === 'hello') {
@@ -309,7 +336,8 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         });
         
         if (isTrusted) {
-          window.webContents.send('pairing-success');
+          if (mainWindow) mainWindow.webContents.send('pairing-success');
+          if (projectionWindow) projectionWindow.webContents.send('pairing-success');
         }
       } else if (inferredType === 'verify-pin') {
         const isMatch = msg.pin === currentPin;
@@ -321,7 +349,8 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         
         if (isMatch) {
           trustedDevices.add(socket.remoteAddress || 'unknown');
-          window.webContents.send('pairing-success');
+          if (mainWindow) mainWindow.webContents.send('pairing-success');
+          if (projectionWindow) projectionWindow.webContents.send('pairing-success');
         } else {
           if (onPinFailure()) {
             return false; // Signal to disconnect
@@ -329,6 +358,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         }
       } else if (inferredType === 'extend_display') {
         // Trigger projection logic (from phone)
+        console.log('Remote extend_display received');
         onToggleProjection(); 
       } else if (inferredType === 'ping') {
         sendControl(socket, {
@@ -340,9 +370,11 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
       console.error('Failed to parse control message:', e);
     }
   } else if (tag === 0x02) { // Video NAL Unit
-    window.webContents.send('video-frame', payload);
+    if (mainWindow) mainWindow.webContents.send('video-frame', payload);
+    if (projectionWindow) projectionWindow.webContents.send('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
-    window.webContents.send('audio-frame', payload);
+    if (mainWindow) mainWindow.webContents.send('audio-frame', payload);
+    if (projectionWindow) projectionWindow.webContents.send('audio-frame', payload);
   }
   return true;
 }
