@@ -269,6 +269,9 @@ window.electronAPI.onControlMessage((msg) => {
 });
 
 window.electronAPI.onVideoFrame((payload: Uint8Array) => {
+  if (frameCount < 5) {
+    logToScreen(`Video IPC received: ${payload.length} bytes (#${frameCount})`);
+  }
   if (!decoder || decoder.state === 'closed') return;
 
   bytesReceived += payload.length;

@@ -384,6 +384,10 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
     if (isConfig) {
       lastConfigFrame = payload;
     }
+    if (frameCount < 5) {
+      console.log(`Video frame #${frameCount} received: ${payload.length} bytes`);
+      frameCount++;
+    }
     broadcastToWindows('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
     broadcastToWindows('audio-frame', payload);
