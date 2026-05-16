@@ -85,7 +85,6 @@ class VideoEncoder(
     // Stored SPS/PPS parameter sets (codec config NAL units)
     private var spsBuffer: ByteArray? = null
     private var ppsBuffer: ByteArray? = null
-    private var firstIdrSent = false
 
     /** Whether configure() has been called — guards stop() against uninitialized codec. */
     @Volatile
@@ -135,7 +134,6 @@ class VideoEncoder(
      */
     fun start(onNalUnit: (ByteArray, Long) -> Unit) {
         isRunning = true
-        firstIdrSent = false
         spsBuffer = null
         ppsBuffer = null
 
@@ -189,9 +187,8 @@ class VideoEncoder(
                                 val stripped = stripAnnexBStartCode(rawBytes)
                                 val presentationTimeUs = bufferInfo.presentationTimeUs
 
-                                if (isKeyFrame && !firstIdrSent) {
+                                if (isKeyFrame) {
                                     val combined = buildCombinedIdrPayload(stripped)
-                                    firstIdrSent = true
                                     onNalUnit(combined, presentationTimeUs)
                                 } else {
                                     onNalUnit(stripped, presentationTimeUs)
