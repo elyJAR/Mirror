@@ -10,7 +10,7 @@ const statusEl = document.getElementById('status')!;
 const debugLogsEl = document.getElementById('debug-logs')!;
 
 function logToScreen(msg: string) {
-  if (debugLogsEl) {
+  if (debugLogsEl && !isProjection) {
     const div = document.createElement('div');
     div.textContent = `> ${msg}`;
     debugLogsEl.prepend(div);
@@ -209,7 +209,7 @@ function applyState(state: any) {
     statusEl.textContent = 'Authenticated. Starting stream...';
   } else {
     inputEnabled = false;
-    if (debugLogsEl) debugLogsEl.style.display = 'block';
+    if (debugLogsEl) debugLogsEl.style.display = isProjection ? 'none' : 'block';
   }
 }
 
@@ -417,8 +417,10 @@ function sendTouch(action: number, e: MouseEvent) {
   const y = (e.clientY - rect.top - offsetY) / scaleY;
   
   if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-    // Visual feedback
-    showTouchFeedback(e.clientX, e.clientY);
+    // Visual feedback (only on main window)
+    if (!isProjection) {
+      showTouchFeedback(e.clientX, e.clientY);
+    }
 
     window.electronAPI.sendControl({
       type: 'touch',
