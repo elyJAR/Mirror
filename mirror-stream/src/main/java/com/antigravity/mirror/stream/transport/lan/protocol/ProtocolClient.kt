@@ -323,7 +323,7 @@ class ProtocolClient(
                 scope.launch { _events.emit(msg) }
             }
             else -> {
-                scope.launch { _events.emit(msg) }
+                scope.launch { _events.emit(TransportEvent.ProtocolControl(msg)) }
             }
         }
     }

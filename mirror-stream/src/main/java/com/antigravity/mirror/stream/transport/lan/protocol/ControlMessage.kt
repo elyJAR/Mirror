@@ -154,3 +154,12 @@ data class ByeMessage(
 data class ExtendDisplayMessage(
     override val type: String = "extend_display"
 ) : ControlMessage()
+/**
+ * Sent by the PC to report its projection status.
+ */
+@Serializable
+@SerialName("projection_state")
+data class ProjectionStateMessage(
+    override val type: String = "projection_state",
+    val active: Boolean
+) : ControlMessage()

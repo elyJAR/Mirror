@@ -38,6 +38,8 @@ if (!gotSingleInstanceLock) {
 
 let mainWindow: BrowserWindow | null = null;
 let projectionWindow: BrowserWindow | null = null;
+let lastSessionParams: any = null;
+let currentPeerAddress: string | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -159,6 +161,9 @@ function startNetworkServices(window: BrowserWindow) {
       projectionWindow.close();
       projectionWindow = null;
       if (mainWindow) mainWindow.webContents.send('projection-state', false);
+      if (activeSocket && !activeSocket.destroyed) {
+        sendControl(activeSocket, { type: 'projection_state', active: false });
+      }
       return false;
     }
 
@@ -192,18 +197,36 @@ function startNetworkServices(window: BrowserWindow) {
 
     projectionWindow.loadURL(url);
 
+    projectionWindow.webContents.on('did-finish-load', () => {
+      if (lastSessionParams) {
+        projectionWindow?.webContents.send('control-message', {
+          type: 'hello-ack',
+          params: lastSessionParams,
+          receiver: 'Mirror PC (Projection)'
+        });
+      }
+      if (currentPeerAddress) {
+        projectionWindow?.webContents.send('peer-connected', { address: currentPeerAddress });
+      }
+    });
+
     projectionWindow.on('closed', () => {
       projectionWindow = null;
       if (mainWindow) mainWindow.webContents.send('projection-state', false);
     });
 
-    if (mainWindow) mainWindow.webContents.send('projection-state', true);
-    return true;
+    const isProjecting = !!projectionWindow;
+    if (mainWindow) mainWindow.webContents.send('projection-state', isProjecting);
+    if (activeSocket && !activeSocket.destroyed) {
+      sendControl(activeSocket, { type: 'projection_state', active: isProjecting });
+    }
+    return isProjecting;
   };
 
   ipcMain.handle('project-to-extended', toggleProjection);
 
   tcpServer = net.createServer((socket) => {
+    activeSocket = socket;
     const remoteAddress = socket.remoteAddress;
     console.log('Phone connected:', remoteAddress);
     
@@ -328,12 +351,17 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         const deviceIp = socket.remoteAddress || 'unknown';
         const isTrusted = trustedDevices.has(deviceIp);
 
+        lastSessionParams = msg.params;
+        currentPeerAddress = socket.remoteAddress || 'unknown';
+
         sendControl(socket, {
           type: 'hello-ack',
           receiver: 'Mirror PC',
           params: { width: 1280, height: 720, fps: 30, codec: chosenCodec },
           pinRequired: !isTrusted
         });
+        
+        lastSessionParams = { width: 1280, height: 720, fps: 30, codec: chosenCodec };
         
         if (isTrusted) {
           if (mainWindow) mainWindow.webContents.send('pairing-success');

@@ -36,6 +36,9 @@ class MirrorClient(context: Context) {
     @Suppress("unused", "MemberVisibilityCanBePrivate")
     protected val appContext: Context = context.applicationContext
     
+    private val _controlMessages = MutableSharedFlow<ControlMessage>(extraBufferCapacity = 16)
+    val controlMessages: SharedFlow<ControlMessage> = _controlMessages.asSharedFlow()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private val transportSelector = TransportSelector(appContext)
@@ -220,6 +223,12 @@ class MirrorClient(context: Context) {
                                 Log.e(TAG, "Transport error: ${event.cause.message}")
                                 _state.value = MirrorState.Error(event.cause, false)
                                 disconnect()
+                            }
+                            is TransportEvent.ProtocolControl -> {
+                                handleControlMessage(event.message)
+                            }
+                            else -> {
+                                Log.d(TAG, "Unhandled transport event: $event")
                             }
                         }
                     }

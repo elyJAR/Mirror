@@ -146,6 +146,7 @@ class MirrorService : Service() {
     fun sendControl(message: com.antigravity.mirror.stream.transport.lan.protocol.ControlMessage) = client.sendControl(message)
     fun getState(): StateFlow<MirrorState> = client.state
     fun getStats(): StateFlow<com.antigravity.mirror.stream.api.SessionStats> = client.stats
+    fun getControlMessages() = client.controlMessages
     fun getStreamStartMs(): Long = client.getStreamStartMs()
 
     // --- Foreground Support ---

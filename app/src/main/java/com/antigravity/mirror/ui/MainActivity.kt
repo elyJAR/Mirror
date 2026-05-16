@@ -406,9 +406,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     // -------------------------------------------------------------------------
-    // State observation
-    // -------------------------------------------------------------------------
-
     private fun observeState() {
         lifecycleScope.launch {
             mirrorService?.getState()?.collect { state ->
@@ -423,6 +420,18 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+        lifecycleScope.launch {
+            mirrorService?.getControlMessages()?.collect { msg ->
+                if (msg is com.antigravity.mirror.stream.transport.lan.protocol.ProjectionStateMessage) {
+                    updateProjectionUI(msg.active)
+                }
+            }
+        }
+    }
+
+    private fun updateProjectionUI(active: Boolean) {
+        extendDisplayStatus.text = if (active) "Currently projecting" else "Toggle secondary monitor"
+        extendDisplayCard.alpha = if (active) 1.0f else 0.8f
     }
 
     private fun renderHUD(stats: com.antigravity.mirror.stream.api.SessionStats) {

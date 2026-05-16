@@ -48,4 +48,8 @@ sealed interface TransportEvent {
      * PIN verification completed successfully and the session can proceed.
      */
     data object PairingVerified : TransportEvent
+    /**
+     * Protocol-specific control message received from the peer.
+     */
+    data class ProtocolControl(val message: com.antigravity.mirror.stream.transport.lan.protocol.ControlMessage) : TransportEvent
 }
