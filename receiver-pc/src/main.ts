@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard, screen } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { Bonjour } from 'bonjour-service';
@@ -37,31 +37,14 @@ if (!gotSingleInstanceLock) {
 }
 
 let mainWindow: BrowserWindow | null = null;
-let projectionWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
 const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
-let activeSocket: net.Socket | null = null;
-let currentPin = '';
+const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 const advertisedName = `Mirror (${os.hostname()})`;
 const trustedDevices = new Set<string>();
-let currentPeer: string | null = null;
-let isPaired = false;
-
-function broadcastSyncState() {
-  broadcastToWindows('sync-state', {
-    currentPin,
-    currentPeer,
-    isPaired,
-    lastHelloMsg
-  });
-}
-let lastConfigFrame: Buffer | null = null;
-let lastHelloMsg: any = null;
-let debugFrameCount = 0;
-let audioDebugCount = 0;
 
 /**
  * Main application window setup.
@@ -75,12 +58,15 @@ const createWindow = () => {
     minWidth: 640,
     minHeight: 360,
     title: 'Mirror Receiver',
-    webPreferences: {
+    packagerConfig: {
+    asar: true,
+    extraResource: [
+      'src/assets'
+    ]
+  },  webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
-
-  mainWindow.setMenuBarVisibility(false);
 
   // Load the renderer app (Vite dev server or static build)
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
@@ -102,88 +88,51 @@ const createWindow = () => {
     if (ip) {
       mainWindow?.webContents.send('local-ip', `${ip}:8765`);
     }
-    if (currentPeer) {
-      mainWindow?.webContents.send('peer-connected', { address: currentPeer });
-    }
-    if (lastHelloMsg) {
-      mainWindow?.webContents.send('control-message', lastHelloMsg);
-    }
-    if (currentPin) {
-      mainWindow?.webContents.send('pairing-pin', currentPin);
-    }
-    if (isPaired) {
-      mainWindow?.webContents.send('pairing-success');
-    }
-    if (lastConfigFrame) {
-      mainWindow?.webContents.send('video-frame', lastConfigFrame);
-    }
   });
 
   startNetworkServices(mainWindow);
-  setupIpc();
   createTray();
 };
 
-function refreshTray() {
-  const ip = getLocalIpAddress() || 'Unknown IP';
-  
-  const possiblePaths = [
-    path.join(app.getAppPath(), 'src', 'assets', 'tray-icon.png'),
-    path.join(process.resourcesPath, 'src', 'assets', 'tray-icon.png'),
-    path.join(process.resourcesPath, 'assets', 'tray-icon.png'),
-    path.join(__dirname, '..', 'src', 'assets', 'tray-icon.png')
-  ];
-
-  let icon = nativeImage.createEmpty();
-  for (const p of possiblePaths) {
-    const img = nativeImage.createFromPath(p);
-    if (!img.isEmpty()) {
-      icon = img;
-      break;
-    }
-  }
-  
-  if (icon.isEmpty()) {
-    icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXcF5yXzUAAABWSURBVBgZ7c6xCQAgDMTAs99fT8AhfIuC/+78EFEuX993LidIAYJFAAAAABJRU5ErkJggg==');
-  }
-  
-  const trayIcon = icon.resize({ width: 16, height: 16 });
-
-  if (!tray) {
-    tray = new Tray(trayIcon);
-  } else {
-    tray.setImage(trayIcon);
-  }
-
-  const contextMenu = Menu.buildFromTemplate([
-    { label: `Mirror Receiver Active`, enabled: false },
-    { label: `Local IP: ${ip}`, enabled: false },
-    { label: 'Copy IP Address', click: () => {
-      if (ip !== 'Unknown IP') {
-        clipboard.writeText(ip);
-      }
-    }},
-    { type: 'separator' },
-    { label: 'Show Receiver', click: () => {
-      mainWindow?.show();
-      mainWindow?.focus();
-    }},
-    { label: currentPin ? `Pairing PIN: ${currentPin}` : 'No active pairing', enabled: !!currentPin, click: () => {
-      if (currentPin) clipboard.writeText(currentPin);
-    }},
-    { type: 'separator' },
-    { label: 'Quit Mirror', click: () => {
-      isQuitting = true;
-      app.quit();
-    }}
-  ]);
-  
-  const status = currentPin ? `Waiting for PIN (${currentPin})` : 'Waiting for connection';
-  tray.setToolTip(`Mirror Receiver\nIP: ${ip}\nStatus: ${status}`);
-  tray.setContextMenu(contextMenu);
-}
-
 function createTray() {
+  const refreshTray = () => {
+    const ip = getLocalIpAddress() || 'Unknown IP';
+    const iconPath = app.isPackaged 
+      ? path.join(process.resourcesPath, 'assets', 'tray-icon.png')
+      : path.join(__dirname, '..', 'src', 'assets', 'tray-icon.png');
+    
+    const icon = nativeImage.createFromPath(iconPath);
+    const trayIcon = icon.resize({ width: 16, height: 16 });
+
+    if (!tray) {
+      tray = new Tray(trayIcon);
+    } else {
+      tray.setImage(trayIcon);
+    }
+
+    const contextMenu = Menu.buildFromTemplate([
+      { label: `Mirror Receiver Active`, enabled: false },
+      { label: `Local IP: ${ip}`, enabled: false },
+      { label: 'Copy IP Address', click: () => {
+        if (ip !== 'Unknown IP') {
+          clipboard.writeText(ip);
+        }
+      }},
+      { type: 'separator' },
+      { label: 'Show Receiver', click: () => {
+        mainWindow?.show();
+        mainWindow?.focus();
+      }},
+      { label: 'Quit Mirror', click: () => {
+        isQuitting = true;
+        app.quit();
+      }}
+    ]);
+    
+    tray.setToolTip(`Mirror Receiver\nIP: ${ip}\nStatus: Waiting for connection`);
+    tray.setContextMenu(contextMenu);
+  };
+
   refreshTray();
   
   // Periodically refresh IP in case of network changes
@@ -212,23 +161,25 @@ function startNetworkServices(window: BrowserWindow) {
   tcpServer = net.createServer((socket) => {
     const remoteAddress = socket.remoteAddress;
     console.log('Phone connected:', remoteAddress);
-    activeSocket = socket;
     
-    // Generate fresh PIN and notify all windows
-    currentPin = Math.floor(1000 + Math.random() * 9000).toString();
-    currentPeer = remoteAddress || 'unknown';
-    isPaired = false;
-    lastConfigFrame = null;
-    lastHelloMsg = null;
-    console.log('New connection from', remoteAddress, 'PIN:', currentPin);
-    
-    refreshTray();
-    broadcastSyncState();
+    // Notify renderer of connection and current PIN
+    window.webContents.send('peer-connected', { address: remoteAddress });
+    window.webContents.send('pairing-pin', currentPin);
     
     let buffer = Buffer.alloc(0);
     let pinAttempts = 0;
     const MAX_PIN_ATTEMPTS = 3;
 
+    // Remove any existing handler to avoid collision
+    ipcMain.removeHandler('send-control');
+    
+    // Handle outgoing control messages from renderer
+    ipcMain.handle('send-control', async (_event, msg) => {
+      if (!socket.destroyed) {
+        sendControl(socket, msg);
+      }
+    });
+    
     socket.on('data', (data) => {
       // Accumulate data into buffer
       buffer = Buffer.concat([buffer, data]);
@@ -265,15 +216,8 @@ function startNetworkServices(window: BrowserWindow) {
 
     socket.on('close', () => {
       console.log('Phone disconnected');
-      if (activeSocket === socket) activeSocket = null;
-      currentPin = '';
-      currentPeer = null;
-      isPaired = false;
-      debugFrameCount = 0;
-      lastConfigFrame = null;
-      lastHelloMsg = null;
-      refreshTray();
-      broadcastSyncState();
+      window.webContents.send('peer-disconnected');
+      ipcMain.removeHandler('send-control'); // Cleanup handler
     });
 
     socket.on('error', (err) => {
@@ -290,7 +234,7 @@ function startNetworkServices(window: BrowserWindow) {
     }
 
     if (mainWindow) {
-      broadcastToWindows('peer-disconnected');
+      window.webContents.send('peer-disconnected');
     }
   });
 
@@ -298,13 +242,6 @@ function startNetworkServices(window: BrowserWindow) {
   tcpServer.listen(8765, () => {
     console.log('TCP Server listening on port 8765 (all interfaces)');
   });
-
-  // Keep-alive heartbeat to prevent phone from resetting to Scanning state
-  setInterval(() => {
-    if (activeSocket && !activeSocket.destroyed && isPaired) {
-      sendControl(activeSocket, { type: 'ping', timestamp: Date.now() });
-    }
-  }, 5000);
 
   // Advertise service via mDNS
   try {
@@ -331,8 +268,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
       
-      lastHelloMsg = msg;
-      broadcastToWindows('control-message', msg);
+      window.webContents.send('control-message', msg);
       
       // Automatic handshake response
       if (inferredType === 'hello') {
@@ -349,11 +285,9 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         });
         
         if (isTrusted) {
-          isPaired = true;
-          broadcastSyncState();
+          window.webContents.send('pairing-success');
         }
-      }
-      if (inferredType === 'verify-pin') {
+      } else if (inferredType === 'verify-pin') {
         const isMatch = msg.pin === currentPin;
         sendControl(socket, {
           type: 'auth-result',
@@ -363,10 +297,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         
         if (isMatch) {
           trustedDevices.add(socket.remoteAddress || 'unknown');
-          isPaired = true;
-          currentPin = '';
-          refreshTray();
-          broadcastSyncState();
+          window.webContents.send('pairing-success');
         } else {
           if (onPinFailure()) {
             return false; // Signal to disconnect
@@ -382,34 +313,9 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
       console.error('Failed to parse control message:', e);
     }
   } else if (tag === 0x02) { // Video NAL Unit
-    // Detect if this is a config frame (SPS/PPS/VPS)
-    let nalOffset = 0;
-    if (payload.length >= 4 && payload[0] === 0 && payload[1] === 0 && payload[2] === 0 && payload[3] === 1) nalOffset = 4;
-    else if (payload.length >= 3 && payload[0] === 0 && payload[1] === 0 && payload[2] === 1) nalOffset = 3;
-    
-    const firstByte = payload[nalOffset];
-    const nalType = firstByte & 0x1F;
-    const hevcType = (firstByte >> 1) & 0x3F;
-    const isConfig = (nalType === 7) || (hevcType === 32 || hevcType === 33);
-    
-    if (isConfig) {
-      lastConfigFrame = payload;
-    }
-    if (debugFrameCount < 5) {
-      console.log(`Video frame #${debugFrameCount} received: ${payload.length} bytes`);
-      debugFrameCount++;
-    }
-    if (!isPaired) {
-      isPaired = true;
-      currentPin = '';
-      broadcastSyncState();
-    }
-    broadcastToWindows('video-frame', payload);
+    window.webContents.send('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
-    if (audioDebugCount++ % 20 === 0) {
-      console.log(`Audio frame received: ${payload.length} bytes`);
-    }
-    broadcastToWindows('audio-frame', payload);
+    window.webContents.send('audio-frame', payload);
   }
   return true;
 }
@@ -430,123 +336,7 @@ function sendControl(socket: net.Socket, msg: Record<string, unknown>) {
   });
 }
 
-function cleanup() {
-  console.log('Cleaning up services...');
-  isQuitting = true;
-  
-  if (bonjour) {
-    try {
-      bonjour.destroy();
-      console.log('mDNS advertiser destroyed');
-    } catch (e) {
-      console.error('Failed to destroy bonjour:', e);
-    }
-  }
-
-  if (tcpServer) {
-    try {
-      tcpServer.close();
-      console.log('TCP server closed');
-    } catch (e) {
-      console.error('Failed to close TCP server:', e);
-    }
-  }
-}
-
-function setupIpc() {
-  ipcMain.removeHandler('get-pairing-state');
-  ipcMain.removeHandler('send-control');
-  ipcMain.removeHandler('project-to-extended');
-
-  ipcMain.handle('get-pairing-state', () => {
-    return {
-      currentPin,
-      currentPeer,
-      isPaired,
-      lastHelloMsg
-    };
-  });
-
-  ipcMain.handle('send-control', async (_, msg) => {
-    if (activeSocket && !activeSocket.destroyed) {
-      sendControl(activeSocket, msg);
-    }
-  });
-
-  ipcMain.handle('project-to-extended', () => {
-    if (projectionWindow) {
-      projectionWindow.close();
-      projectionWindow = null;
-      return false;
-    }
-
-    const displays = screen.getAllDisplays();
-    const externalDisplay = displays.find((display) => {
-      return display.bounds.x !== 0 || display.bounds.y !== 0;
-    });
-
-    if (externalDisplay) {
-      projectionWindow = new BrowserWindow({
-        x: externalDisplay.bounds.x,
-        y: externalDisplay.bounds.y,
-        fullscreen: true,
-        autoHideMenuBar: true,
-        webPreferences: {
-          preload: path.join(__dirname, 'preload.js'),
-        },
-      });
-
-      if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-        projectionWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?projection=true`);
-      } else {
-        projectionWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), { query: { projection: 'true' } });
-      }
-
-      // Force a keyframe so the new window starts decoding immediately
-      if (activeSocket) {
-        sendControl(activeSocket, { type: 'request-keyframe' });
-      }
-
-      projectionWindow.on('closed', () => {
-        projectionWindow = null;
-        mainWindow?.webContents.send('projection-state', false);
-      });
-
-      projectionWindow.webContents.on('did-finish-load', () => {
-        // Send unified state immediately
-        projectionWindow?.webContents.send('sync-state', {
-          currentPin,
-          currentPeer,
-          isPaired,
-          lastHelloMsg
-        });
-        
-        if (lastConfigFrame) {
-          projectionWindow?.webContents.send('video-frame', lastConfigFrame);
-        }
-      });
-
-      return true;
-    }
-    return false;
-  });
-}
-
-function broadcastToWindows(channel: string, ...args: any[]) {
-  if (channel !== 'video-frame' && channel !== 'audio-frame') {
-    console.log(`Broadcasting ${channel} to ${mainWindow ? 'Main' : 'None'} and ${projectionWindow ? 'Projection' : 'None'}`);
-  }
-  if (mainWindow) {
-    mainWindow.webContents.send(channel, ...args);
-  }
-  if (projectionWindow) {
-    projectionWindow.webContents.send(channel, ...args);
-  }
-}
-
 app.on('ready', createWindow);
-
-app.on('before-quit', cleanup);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

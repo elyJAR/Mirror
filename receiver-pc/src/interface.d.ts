@@ -19,7 +19,5 @@ declare global {
     electronAPI: IElectronAPI;
     AudioDecoder: any;
     EncodedAudioChunk: any;
-    AudioContext: any;
-    webkitAudioContext: any;
   }
 }

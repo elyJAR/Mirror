@@ -12,6 +12,7 @@ private const val MIME_TYPE = "audio/mp4a-latm" // AAC
 private const val SAMPLE_RATE = 44100
 private const val CHANNEL_COUNT = 2
 private const val BITRATE = 128000
+private const val BUFFER_SIZE_FACTOR = 2
 
 /**
  * Captures system audio via [MediaProjection] and encodes it to AAC.
@@ -21,9 +22,6 @@ private const val BITRATE = 128000
 class AudioEncoder(private val mediaProjection: MediaProjection) {
     private var codec: MediaCodec? = null
     private var audioRecord: AudioRecord? = null
-    
-    private var bufferSizeFactor = 2
-    private var pcmBufferSize = 4096
     
     @Volatile
     private var isRunning = false
@@ -35,7 +33,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
      * Only works on Android 10+ (API 29).
      */
     @SuppressLint("MissingPermission", "NewApi")
-    fun start(latencyMode: com.antigravity.mirror.stream.api.LatencyMode, onAudioData: (ByteArray, Long) -> Unit) {
+    fun start(onAudioData: (ByteArray, Long) -> Unit) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             Log.w(TAG, "Audio capture requires Android 10+")
             return
@@ -43,22 +41,6 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
 
         if (isRunning) return
         isRunning = true
-        
-        // Configure buffers based on latency mode
-        when (latencyMode) {
-            com.antigravity.mirror.stream.api.LatencyMode.LOW -> {
-                bufferSizeFactor = 2
-                pcmBufferSize = 4096 // ~23ms
-            }
-            com.antigravity.mirror.stream.api.LatencyMode.BALANCED -> {
-                bufferSizeFactor = 3
-                pcmBufferSize = 6144 // ~35ms
-            }
-            com.antigravity.mirror.stream.api.LatencyMode.QUALITY -> {
-                bufferSizeFactor = 4
-                pcmBufferSize = 8192 // ~46ms
-            }
-        }
         
         try {
             // 1. Configure Codec
@@ -90,7 +72,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
                     .setSampleRate(SAMPLE_RATE)
                     .setChannelMask(AudioFormat.CHANNEL_IN_STEREO)
                     .build())
-                .setBufferSizeInBytes(minBufferSize * bufferSizeFactor)
+                .setBufferSizeInBytes(minBufferSize * BUFFER_SIZE_FACTOR)
                 .setAudioPlaybackCaptureConfig(config)
                 .build()
 
@@ -98,7 +80,6 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
 
             // 3. Start Loop
             encodingThread = Thread({
-                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
                 runLoop(onAudioData)
             }, "AudioEncoder-Thread").apply { start() }
             
@@ -111,32 +92,25 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
 
     private fun runLoop(onAudioData: (ByteArray, Long) -> Unit) {
         val bufferInfo = MediaCodec.BufferInfo()
-        val pcmBuffer = ByteArray(pcmBufferSize)
+        val pcmBuffer = ByteArray(4096) // 4KB chunks
 
-        var readCount = 0
         try {
             while (isRunning) {
                 // Read PCM from AudioRecord
                 val readSize = audioRecord?.read(pcmBuffer, 0, pcmBuffer.size) ?: -1
-                if (readCount++ % 100 == 0) {
-                    Log.d(TAG, "AudioRecord read: $readSize bytes")
-                }
                 if (readSize <= 0) {
                     if (!isRunning) break
-                    Thread.yield()
                     continue
                 }
 
                 // Feed into MediaCodec
                 val inputIndex = codec?.dequeueInputBuffer(10000) ?: -1
                 if (inputIndex >= 0) {
-                    val inputBuffer = codec?.getInputBuffer(inputIndex)
-                    if (inputBuffer != null) {
-                        inputBuffer.clear()
-                        val bytesToPut = minOf(readSize, inputBuffer.remaining())
-                        inputBuffer.put(pcmBuffer, 0, bytesToPut)
-                        codec?.queueInputBuffer(inputIndex, 0, bytesToPut, System.nanoTime() / 1000, 0)
-                    }
+                    val inputBuffer = codec?.getInputBuffer(inputIndex)!!
+                    inputBuffer.clear()
+                    val bytesToPut = minOf(readSize, inputBuffer.remaining())
+                    inputBuffer.put(pcmBuffer, 0, bytesToPut)
+                    codec?.queueInputBuffer(inputIndex, 0, bytesToPut, System.nanoTime() / 1000, 0)
                 }
 
                 // Drain MediaCodec
@@ -144,12 +118,10 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
                 while (outputIndex >= 0) {
                     val isCodecConfig = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                     if (!isCodecConfig && bufferInfo.size > 0) {
-                        val outputBuffer = codec?.getOutputBuffer(outputIndex)
-                        if (outputBuffer != null) {
-                            val data = ByteArray(bufferInfo.size)
-                            outputBuffer.get(data)
-                            onAudioData(data, bufferInfo.presentationTimeUs)
-                        }
+                        val outputBuffer = codec?.getOutputBuffer(outputIndex)!!
+                        val data = ByteArray(bufferInfo.size)
+                        outputBuffer.get(data)
+                        onAudioData(data, bufferInfo.presentationTimeUs)
                     }
                     codec?.releaseOutputBuffer(outputIndex, false)
                     outputIndex = codec?.dequeueOutputBuffer(bufferInfo, 0) ?: -1
@@ -157,7 +129,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
             }
         } catch (e: Exception) {
             if (isRunning) {
-                Log.e(TAG, "Audio encoding loop error: ${e.javaClass.simpleName}: ${e.message}", e)
+                Log.e(TAG, "Audio encoding loop error: ${e.message}")
             }
         }
     }

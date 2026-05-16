@@ -7,48 +7,12 @@
  */
 
 const statusEl = document.getElementById('status')!;
-const debugLogsEl = document.getElementById('debug-logs')!;
-
-function logToScreen(msg: string) {
-  if (debugLogsEl && !isProjection) {
-    const div = document.createElement('div');
-    div.textContent = `> ${msg}`;
-    debugLogsEl.prepend(div);
-  }
-  console.log('[UI LOG]', msg);
-}
 const peerEl = document.getElementById('peer')!;
 const statsEl = document.getElementById('stats')!;
 const hudEl = document.getElementById('hud')!;
 const pairingEl = document.getElementById('pairing')!;
 const pinEl = document.getElementById('pin')!;
-const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
-const btnRefresh = document.getElementById('btnRefresh') as HTMLButtonElement;
-const audioStatusEl = document.getElementById('audio-status')!;
 const canvas = document.getElementById('videoCanvas') as HTMLCanvasElement;
-
-const isProjection = new URLSearchParams(window.location.search).get('projection') === 'true';
-
-if (isProjection) {
-  btnProject.style.display = 'none';
-  statusEl.style.display = 'none';
-  hudEl.style.display = 'none';
-}
-
-btnProject.onclick = async () => {
-  const isNowProjecting = await window.electronAPI.projectToExtended();
-  updateProjectionUI(isNowProjecting);
-};
-
-function updateProjectionUI(isProjecting: boolean) {
-  btnProject.textContent = isProjecting ? 'Stop Projection' : 'Project to Extended';
-  btnProject.style.backgroundColor = isProjecting ? '#ff4444' : '';
-}
-
-window.electronAPI.onProjectionState((isProjecting: boolean) => {
-  updateProjectionUI(isProjecting);
-});
-
 const ctx = canvas.getContext('2d')!;
 
 let hudVisible = false;
@@ -63,8 +27,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 let decoder: VideoDecoder | null = null;
-let audioDecoder: any = null;
-let audioCtx: any = null;
+let audioDecoder: AudioDecoder | null = null;
+let audioCtx: AudioContext | null = null;
 let nextAudioTime = 0;
 let inputEnabled = false;
 
@@ -72,7 +36,6 @@ let isConfigured = false;
 let frameCount = 0;
 let bytesReceived = 0;
 let lastStatsTime = Date.now();
-let audioDebugCount = 0;
 
 function initDecoder() {
   if (decoder) {
@@ -111,7 +74,7 @@ function initAudio() {
   }
 
   audioDecoder = new window.AudioDecoder({
-    output: (data: any) => {
+    output: (data) => {
       if (!audioCtx) return;
 
       const buffer = audioCtx.createBuffer(
@@ -124,31 +87,17 @@ function initAudio() {
         data.copyTo(buffer.getChannelData(i), { planeIndex: i });
       }
 
-      if (audioCtx.state === 'suspended') {
-        audioCtx.resume();
-      }
-
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
-      // Smooth playback with a small 30ms jitter buffer
-      const now = audioCtx.currentTime;
-      const bufferPadding = 0.03; // 30ms
-
-      if (nextAudioTime < now) {
-        nextAudioTime = now + bufferPadding;
-      } else if (nextAudioTime > now + 0.2) {
-        // If we are more than 200ms ahead, force a sync to reduce latency
-        nextAudioTime = now + bufferPadding;
-      }
-
-      source.start(nextAudioTime);
-      nextAudioTime += buffer.duration;
+      const startTime = Math.max(nextAudioTime, audioCtx.currentTime);
+      source.start(startTime);
+      nextAudioTime = startTime + buffer.duration;
 
       data.close();
     },
-    error: (e: Error) => console.error('AudioDecoder error:', e),
+    error: (e) => console.error('AudioDecoder error:', e),
   });
 
   // AudioSpecificConfig for AAC-LC, 44100 Hz, stereo:
@@ -162,8 +111,6 @@ function initAudio() {
   });
 
   console.log('AudioDecoder configured (AAC-LC 44100Hz stereo)');
-  audioStatusEl.textContent = 'Audio: Live';
-  audioStatusEl.style.color = '#00ff00';
 }
 
 // Initialise audio on any user interaction (fallback / reconnect path)
@@ -173,21 +120,7 @@ window.addEventListener('click', () => {
 
 // ...
 window.electronAPI.onAudioFrame((payload: Uint8Array) => {
-  if (audioDebugCount++ % 50 === 0) {
-    console.log(`Audio frame received in renderer: ${payload.length} bytes`);
-  }
-  
-  if (!audioDecoder || audioDecoder.state === 'closed') {
-    // If we have frames but no decoder, try a late-init (might still need user gesture)
-    if (audioDebugCount % 100 === 0) {
-        console.warn('Audio frame received but decoder not ready. User click might be required.');
-        audioStatusEl.textContent = 'Audio: Click to Enable';
-        audioStatusEl.style.color = '#ffaa00';
-        audioStatusEl.style.cursor = 'pointer';
-        audioStatusEl.onclick = () => initAudio();
-    }
-    return;
-  }
+  if (!audioDecoder || audioDecoder.state === 'closed') return;
 
   const chunk = new window.EncodedAudioChunk({
     type: 'key',
@@ -202,96 +135,29 @@ window.electronAPI.onAudioFrame((payload: Uint8Array) => {
   }
 });
 
-// --- State Management ---
-
-function applyState(state: any) {
-  logToScreen(`Applying state: peer=${state.currentPeer}, pin=${state.currentPin}, paired=${state.isPaired}`);
-  
-  if (state.currentPeer) {
-    peerEl.textContent = state.currentPeer;
-    statusEl.textContent = 'Connected, waiting for stream...';
-    if (!isProjection) {
-      btnProject.style.display = 'block';
-    }
-  } else {
-    peerEl.textContent = 'No Peer';
-    statusEl.textContent = 'Waiting for phone...';
-    btnProject.style.display = 'none';
-  }
-
-  if (state.currentPin) {
-    pinEl.textContent = state.currentPin;
-    pairingEl.style.display = 'block';
-  } else {
-    // Only hide pairing if we are actually paired or disconnected
-    if (state.isPaired || !state.currentPeer) {
-      pairingEl.style.display = 'none';
-    }
-  }
-
-  if (state.isPaired) {
-    pairingEl.style.display = 'none';
-    if (debugLogsEl) debugLogsEl.style.display = 'none';
-    inputEnabled = true;
-    statusEl.textContent = 'Authenticated. Starting stream...';
-  } else {
-    inputEnabled = false;
-    if (debugLogsEl) debugLogsEl.style.display = isProjection ? 'none' : 'block';
-  }
-}
-
-if (btnRefresh) {
-  btnRefresh.onclick = () => {
-    logToScreen('Manual refresh requested');
-    window.electronAPI.getPairingState().then(applyState);
-  };
-}
-
-window.electronAPI.onSyncState((state: any) => {
-  logToScreen('SYNC state received');
-  applyState(state);
-});
-
 // Initial setup
-try {
-  initDecoder();
-  logToScreen('Renderer initialized');
-} catch (e) {
-  logToScreen(`Init error: ${e}`);
-}
-
-// Fetch initial state with a slight delay
-setTimeout(() => {
-  logToScreen('Initial state fetch...');
-  window.electronAPI.getPairingState().then(applyState);
-}, 500);
+initDecoder();
+statusEl.textContent = 'Waiting for phone...';
 
 // --- IPC Event Handlers ---
 
 window.electronAPI.onLocalIp((ip) => {
-  logToScreen(`Local IP received: ${ip}`);
   statusEl.textContent = `Waiting for phone at ${ip}...`;
 });
 
 window.electronAPI.onPeerConnected((peer) => {
-  logToScreen(`Peer connected: ${peer.address}`);
   peerEl.textContent = peer.address;
   statusEl.textContent = 'Connected, waiting for stream...';
   initDecoder(); // Re-init on new connection
   inputEnabled = false;
-  if (!isProjection) {
-    btnProject.style.display = 'block';
-  }
 });
 
 window.electronAPI.onPeerDisconnected(() => {
-  logToScreen('Peer disconnected');
   peerEl.textContent = 'No Peer';
   statusEl.textContent = 'Waiting for phone...';
   isConfigured = false;
   pairingEl.style.display = 'none';
   inputEnabled = false;
-  btnProject.style.display = 'none';
 });
 
 window.electronAPI.onControlMessage((msg) => {
@@ -301,21 +167,7 @@ window.electronAPI.onControlMessage((msg) => {
   }
 });
 
-// Click anywhere to enable audio (browser requirement)
-document.addEventListener('click', () => {
-  if (audioCtx?.state === 'suspended') {
-    audioCtx.resume();
-  }
-  if (!audioDecoder || audioDecoder.state === 'closed') {
-    initAudio();
-    logToScreen('Audio initialization attempted via user click');
-  }
-}, { once: false });
-
 window.electronAPI.onVideoFrame((payload: Uint8Array) => {
-  if (frameCount < 5) {
-    logToScreen(`Video IPC received: ${payload.length} bytes (#${frameCount})`);
-  }
   if (!decoder || decoder.state === 'closed') return;
 
   bytesReceived += payload.length;
@@ -367,7 +219,7 @@ window.electronAPI.onVideoFrame((payload: Uint8Array) => {
     ? ((hevcType >= 16 && hevcType <= 21) || (hevcType >= 32 && hevcType <= 34))
     : (nalType === 5 || nalType === 7);
 
-  const chunk = new EncodedVideoChunk({
+  const chunk = new window.EncodedVideoChunk({
     type: isKey ? 'key' : 'delta',
     timestamp: performance.now() * 1000,
     data: annexB,
@@ -397,15 +249,15 @@ setInterval(() => {
 
 // --- Touch-back (Input Injection) ---
 
-canvas.addEventListener('mousedown', (e: MouseEvent) => {
+canvas.addEventListener('mousedown', (e) => {
   sendTouch(0, e);
 });
 
-canvas.addEventListener('mouseup', (e: MouseEvent) => {
+canvas.addEventListener('mouseup', (e) => {
   sendTouch(1, e);
 });
 
-canvas.addEventListener('mousemove', (e: MouseEvent) => {
+canvas.addEventListener('mousemove', (e) => {
   if (e.buttons > 0) {
     sendTouch(2, e);
   }
@@ -417,37 +269,10 @@ function sendTouch(action: number, e: MouseEvent) {
   }
 
   const rect = canvas.getBoundingClientRect();
-  const containerAspect = rect.width / rect.height;
-  const videoAspect = canvas.width / canvas.height;
-
-  let offsetX = 0;
-  let offsetY = 0;
-  let scaleX = 1;
-  let scaleY = 1;
-
-  if (containerAspect > videoAspect) {
-    // Letterboxed on sides
-    const actualWidth = rect.height * videoAspect;
-    offsetX = (rect.width - actualWidth) / 2;
-    scaleX = actualWidth;
-    scaleY = rect.height;
-  } else {
-    // Letterboxed top/bottom
-    const actualHeight = rect.width / videoAspect;
-    offsetY = (rect.height - actualHeight) / 2;
-    scaleX = rect.width;
-    scaleY = actualHeight;
-  }
-
-  const x = (e.clientX - rect.left - offsetX) / scaleX;
-  const y = (e.clientY - rect.top - offsetY) / scaleY;
+  const x = (e.clientX - rect.left) / rect.width;
+  const y = (e.clientY - rect.top) / rect.height;
   
   if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-    // Visual feedback (only on main window)
-    if (!isProjection) {
-      showTouchFeedback(e.clientX, e.clientY);
-    }
-
     window.electronAPI.sendControl({
       type: 'touch',
       action,
@@ -455,22 +280,6 @@ function sendTouch(action: number, e: MouseEvent) {
       y
     });
   }
-}
-
-function showTouchFeedback(x: number, y: number) {
-  const dot = document.createElement('div');
-  dot.style.position = 'absolute';
-  dot.style.left = `${x - 5}px`;
-  dot.style.top = `${y - 5}px`;
-  dot.style.width = '10px';
-  dot.style.height = '10px';
-  dot.style.background = '#00ff00';
-  dot.style.borderRadius = '50%';
-  dot.style.pointerEvents = 'none';
-  dot.style.zIndex = '1000';
-  dot.style.boxShadow = '0 0 10px #00ff00';
-  document.body.appendChild(dot);
-  setTimeout(() => dot.remove(), 200);
 }
 
 // Key events
@@ -501,13 +310,11 @@ window.addEventListener('keydown', (e) => {
 // --- Pairing IPC Handlers ---
 
 window.electronAPI.onPairingPin((pin) => {
-  logToScreen(`Pairing PIN received: ${pin}`);
   pinEl.textContent = pin;
   pairingEl.style.display = 'block';
 });
 
 window.electronAPI.onPairingSuccess(() => {
-  logToScreen('Pairing SUCCESS');
   pairingEl.style.display = 'none';
   statusEl.textContent = 'Authenticated. Starting stream...';
   inputEnabled = true;
