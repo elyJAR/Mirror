@@ -18,6 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     
   onPeerConnected: (callback: (peer: { address: string }) => void) =>
     ipcRenderer.on('peer-connected', (_, value) => callback(value)),
+    
+  onPeerDisconnected: (callback: () => void) =>
+    ipcRenderer.on('peer-disconnected', () => callback()),
 
   onPairingPin: (callback: (pin: string) => void) =>
     ipcRenderer.on('pairing-pin', (_, value) => callback(value)),
