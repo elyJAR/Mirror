@@ -60,6 +60,7 @@ let lastConfigFrame: Buffer | null = null;
 let lastHelloMsg: any = null;
 let currentPeer: string | null = null;
 let isPaired = false;
+let debugFrameCount = 0;
 
 /**
  * Main application window setup.
@@ -267,6 +268,7 @@ function startNetworkServices(window: BrowserWindow) {
       currentPin = '';
       currentPeer = null;
       isPaired = false;
+      debugFrameCount = 0;
       lastConfigFrame = null;
       lastHelloMsg = null;
       refreshTray();
@@ -384,9 +386,9 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
     if (isConfig) {
       lastConfigFrame = payload;
     }
-    if (frameCount < 5) {
-      console.log(`Video frame #${frameCount} received: ${payload.length} bytes`);
-      frameCount++;
+    if (debugFrameCount < 5) {
+      console.log(`Video frame #${debugFrameCount} received: ${payload.length} bytes`);
+      debugFrameCount++;
     }
     broadcastToWindows('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
