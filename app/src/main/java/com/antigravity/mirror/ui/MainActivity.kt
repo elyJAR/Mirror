@@ -22,6 +22,7 @@ import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
 import com.google.android.material.bottomnavigation.BottomNavigationView
+import com.google.android.material.button.MaterialButton
 import java.util.Locale
 import java.util.Timer
 import java.util.TimerTask
@@ -73,7 +74,7 @@ class MainActivity : AppCompatActivity() {
 
     // Streaming panel
     private lateinit var disconnectButton: Button
-    private lateinit var pauseButton: Button
+    private lateinit var pauseButton: MaterialButton
     private lateinit var streamTimer: TextView
     private lateinit var streamTargetName: TextView
     private lateinit var streamStatsHud: TextView
@@ -253,10 +254,12 @@ class MainActivity : AppCompatActivity() {
             val isStreaming = mirrorService?.getState()?.value is MirrorState.Streaming
             if (isStreaming) {
                 mirrorService?.pause()
-                pauseButton.setImageResource(R.drawable.ic_play)
+                pauseButton.setIconResource(R.drawable.ic_play)
+                pauseButton.text = "Resume"
             } else {
                 mirrorService?.resume()
-                pauseButton.setImageResource(R.drawable.ic_pause)
+                pauseButton.setIconResource(R.drawable.ic_pause)
+                pauseButton.text = "Pause"
             }
         }
         retryButton.setOnClickListener     { onDiscoverClicked() }
