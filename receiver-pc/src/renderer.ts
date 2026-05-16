@@ -343,6 +343,7 @@ window.addEventListener('keydown', (e) => {
 // --- Pairing IPC Handlers ---
 
 window.electronAPI.onPairingPin((pin) => {
+  console.log('Received pairing PIN:', pin);
   pinEl.textContent = pin;
   pairingEl.style.display = 'block';
 });

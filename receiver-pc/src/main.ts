@@ -43,7 +43,7 @@ let isQuitting = false;
 
 const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
-const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+let currentPin = '';
 const advertisedName = `Mirror (${os.hostname()})`;
 const trustedDevices = new Set<string>();
 
@@ -179,9 +179,12 @@ function startNetworkServices(window: BrowserWindow) {
     const remoteAddress = socket.remoteAddress;
     console.log('Phone connected:', remoteAddress);
     
-    // Notify renderer of connection and current PIN
-    window.webContents.send('peer-connected', { address: remoteAddress });
-    window.webContents.send('pairing-pin', currentPin);
+    // Generate fresh PIN and notify all windows
+    currentPin = Math.floor(1000 + Math.random() * 9000).toString();
+    console.log('New connection from', remoteAddress, 'PIN:', currentPin);
+    
+    broadcastToWindows('peer-connected', { address: remoteAddress });
+    broadcastToWindows('pairing-pin', currentPin);
     
     let buffer = Buffer.alloc(0);
     let pinAttempts = 0;
