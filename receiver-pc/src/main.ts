@@ -60,8 +60,6 @@ function broadcastSyncState() {
 }
 let lastConfigFrame: Buffer | null = null;
 let lastHelloMsg: any = null;
-let currentPeer: string | null = null;
-let isPaired = false;
 let debugFrameCount = 0;
 
 /**
