@@ -287,7 +287,7 @@ class MirrorClient(context: Context) {
                 Log.d(TAG, "Creating AudioEncoder")
                 audioEncoder = AudioEncoder(projection).apply {
                     Log.d(TAG, "Starting AudioEncoder with latencyMode=${config.latencyMode}")
-                    start(config.latencyMode) { data, pts ->
+                    start { data, _ ->
                         session.audioSink.trySend(data)
                     }
                     Log.d(TAG, "AudioEncoder started")
