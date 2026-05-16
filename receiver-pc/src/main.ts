@@ -47,6 +47,8 @@ let activeSocket: net.Socket | null = null;
 let currentPin = '';
 const advertisedName = `Mirror (${os.hostname()})`;
 const trustedDevices = new Set<string>();
+let currentPeer: string | null = null;
+let isPaired = false;
 
 function broadcastSyncState() {
   broadcastToWindows('sync-state', {

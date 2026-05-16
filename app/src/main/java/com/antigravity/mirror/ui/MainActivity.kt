@@ -74,7 +74,6 @@ class MainActivity : AppCompatActivity() {
 
     // Streaming panel
     private lateinit var disconnectButton: Button
-    private lateinit var pauseButton: MaterialButton
     private lateinit var streamTimer: TextView
     private lateinit var streamTargetName: TextView
     private lateinit var streamStatsHud: TextView
@@ -200,7 +199,6 @@ class MainActivity : AppCompatActivity() {
 
         // Streaming
         disconnectButton = findViewById(R.id.disconnectButton)
-        pauseButton      = findViewById(R.id.pauseButton)
         streamTimer      = findViewById(R.id.streamTimer)
         streamTargetName = findViewById(R.id.streamTargetName)
         streamStatsHud   = findViewById(R.id.streamStatsHud)
@@ -250,18 +248,6 @@ class MainActivity : AppCompatActivity() {
 
         discoverButton.setOnClickListener  { onDiscoverClicked() }
         disconnectButton.setOnClickListener { onDisconnectClicked() }
-        pauseButton.setOnClickListener {
-            val isStreaming = mirrorService?.getState()?.value is MirrorState.Streaming
-            if (isStreaming) {
-                mirrorService?.pause()
-                pauseButton.setIconResource(R.drawable.ic_play)
-                pauseButton.text = "Resume"
-            } else {
-                mirrorService?.resume()
-                pauseButton.setIconResource(R.drawable.ic_pause)
-                pauseButton.text = "Pause"
-            }
-        }
         retryButton.setOnClickListener     { onDiscoverClicked() }
 
         streamStatsHud.setOnLongClickListener {

@@ -85,17 +85,6 @@ class MirrorClient(context: Context) {
 
     fun getStreamStartMs() = streamStartMs
 
-    fun pause() {
-        captureEngine?.stop()
-        // We stay in Streaming state but stop sending frames
-    }
-
-    fun resume() {
-        val config = lastConfig ?: MirrorConfig()
-        captureEngine?.start(config.width, config.height, 160)
-        videoEncoder?.requestKeyframe()
-    }
-
     /** Begin discovering receivers across both transports. */
     fun startDiscovery() {
         stopDiscovery()

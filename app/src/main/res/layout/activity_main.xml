@@ -682,16 +682,6 @@
                     </com.google.android.material.button.MaterialButtonToggleGroup>
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Pause / Stop buttons -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/pauseButton"
-                    style="@style/Widget.Mirror.Button.Outlined"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginTop="32dp"
-                    android:text="@string/btn_pause_mirroring"
-                    app:icon="@drawable/ic_pause"
-                    app:iconGravity="textStart" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/disconnectButton"
