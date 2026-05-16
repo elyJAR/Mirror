@@ -226,32 +226,38 @@ class ProtocolClient(
                 // Wait for a signal that data is available
                 queueSignal.receive()
                 
-                var nal: NalUnit?
+                // Drain both queues in each signal cycle, but prioritize audio
                 while (true) {
-                    synchronized(videoQueue) {
-                        nal = videoQueue.pollFirst()
-                    }
-                    if (nal == null) break
-                    
-                    writeMutex.withLock {
-                        writeChannel.writeFrame(TAG_VIDEO, nal!!.payload)
-                    }
-                    framesSent++
-                    bytesSent += nal!!.payload.size
-                }
-
-                // Drain audio queue
-                while (true) {
+                    // 1. Drain Audio (Highest Priority for latency)
                     val audio: ByteArray?
                     synchronized(audioQueue) {
                         audio = audioQueue.pollFirst()
                     }
-                    if (audio == null) break
-                    
-                    writeMutex.withLock {
-                        writeChannel.writeFrame(TAG_AUDIO, audio)
+                    if (audio != null) {
+                        writeMutex.withLock {
+                            writeChannel.writeFrame(TAG_AUDIO, audio)
+                        }
+                        if (bytesSent % 100000 == 0) Log.d(TAG, "Sent audio frame: ${audio.size} bytes")
+                        bytesSent += audio.size
+                        continue // Keep draining audio as long as it's available
                     }
-                    bytesSent += audio.size
+
+                    // 2. Drain Video (One frame at a time to allow audio interleaving)
+                    var nal: NalUnit?
+                    synchronized(videoQueue) {
+                        nal = videoQueue.pollFirst()
+                    }
+                    if (nal != null) {
+                        writeMutex.withLock {
+                            writeChannel.writeFrame(TAG_VIDEO, nal!!.payload)
+                        }
+                        framesSent++
+                        bytesSent += nal!!.payload.size
+                        // Don't 'continue' here, let the next loop check audio again
+                    } else {
+                        // Both queues empty
+                        break
+                    }
                 }
             }
         } catch (e: Exception) {
