@@ -43,6 +43,7 @@ let isQuitting = false;
 
 const bonjour = new Bonjour();
 let tcpServer: net.Server | null = null;
+let activeSocket: net.Socket | null = null;
 let currentPin = '';
 const advertisedName = `Mirror (${os.hostname()})`;
 const trustedDevices = new Set<string>();
@@ -106,6 +107,7 @@ const createWindow = () => {
   });
 
   startNetworkServices(mainWindow);
+  setupIpc();
   createTray();
 };
 
@@ -197,6 +199,7 @@ function startNetworkServices(window: BrowserWindow) {
   tcpServer = net.createServer((socket) => {
     const remoteAddress = socket.remoteAddress;
     console.log('Phone connected:', remoteAddress);
+    activeSocket = socket;
     
     // Generate fresh PIN and notify all windows
     currentPin = Math.floor(1000 + Math.random() * 9000).toString();
@@ -214,16 +217,6 @@ function startNetworkServices(window: BrowserWindow) {
     let pinAttempts = 0;
     const MAX_PIN_ATTEMPTS = 3;
 
-    // Remove any existing handler to avoid collision
-    ipcMain.removeHandler('send-control');
-    
-    // Handle outgoing control messages from renderer
-    ipcMain.handle('send-control', async (_event, msg) => {
-      if (!socket.destroyed) {
-        sendControl(socket, msg);
-      }
-    });
-    
     socket.on('data', (data) => {
       // Accumulate data into buffer
       buffer = Buffer.concat([buffer, data]);
@@ -260,6 +253,7 @@ function startNetworkServices(window: BrowserWindow) {
 
     socket.on('close', () => {
       console.log('Phone disconnected');
+      if (activeSocket === socket) activeSocket = null;
       currentPin = '';
       currentPeer = null;
       isPaired = false;
@@ -267,7 +261,6 @@ function startNetworkServices(window: BrowserWindow) {
       lastHelloMsg = null;
       refreshTray();
       broadcastToWindows('peer-disconnected');
-      ipcMain.removeHandler('send-control'); // Cleanup handler
     });
 
     socket.on('error', (err) => {
@@ -425,71 +418,75 @@ function cleanup() {
       console.error('Failed to close TCP server:', e);
     }
   }
-
-  ipcMain.removeHandler('send-control');
 }
 
-ipcMain.handle('get-pairing-state', () => {
-  return {
-    currentPin,
-    currentPeer,
-    isPaired,
-    lastHelloMsg
-  };
-});
+function setupIpc() {
+  ipcMain.removeHandler('get-pairing-state');
+  ipcMain.removeHandler('send-control');
+  ipcMain.removeHandler('project-to-extended');
 
-ipcMain.handle('project-to-extended', () => {
-  if (projectionWindow) {
-    projectionWindow.close();
-    projectionWindow = null;
-    return false;
-  }
-
-  const displays = screen.getAllDisplays();
-  const externalDisplay = displays.find((display) => {
-    return display.bounds.x !== 0 || display.bounds.y !== 0;
+  ipcMain.handle('get-pairing-state', () => {
+    return {
+      currentPin,
+      currentPeer,
+      isPaired,
+      lastHelloMsg
+    };
   });
 
-  if (externalDisplay) {
-    projectionWindow = new BrowserWindow({
-      x: externalDisplay.bounds.x,
-      y: externalDisplay.bounds.y,
-      fullscreen: true,
-      autoHideMenuBar: true,
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-      },
-    });
+  ipcMain.handle('send-control', async (_event, msg) => {
+    if (activeSocket && !activeSocket.destroyed) {
+      sendControl(activeSocket, msg);
+    }
+  });
 
-    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
-      projectionWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?projection=true`);
-    } else {
-      projectionWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), { query: { projection: 'true' } });
+  ipcMain.handle('project-to-extended', () => {
+    if (projectionWindow) {
+      projectionWindow.close();
+      projectionWindow = null;
+      return false;
     }
 
-    projectionWindow.on('closed', () => {
-      projectionWindow = null;
-      mainWindow?.webContents.send('projection-state', false);
+    const displays = screen.getAllDisplays();
+    const externalDisplay = displays.find((display) => {
+      return display.bounds.x !== 0 || display.bounds.y !== 0;
     });
 
-    projectionWindow.webContents.on('did-finish-load', () => {
-      if (currentPeer) projectionWindow?.webContents.send('peer-connected', { address: currentPeer });
-      if (lastHelloMsg) projectionWindow?.webContents.send('control-message', lastHelloMsg);
-      if (currentPin) projectionWindow?.webContents.send('pairing-pin', currentPin);
-      if (isPaired) projectionWindow?.webContents.send('pairing-success');
-      if (lastConfigFrame) projectionWindow?.webContents.send('video-frame', lastConfigFrame);
-    });
+    if (externalDisplay) {
+      projectionWindow = new BrowserWindow({
+        x: externalDisplay.bounds.x,
+        y: externalDisplay.bounds.y,
+        fullscreen: true,
+        autoHideMenuBar: true,
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+        },
+      });
 
-    projectionWindow.webContents.on('did-finish-load', () => {
-      if (currentPin) {
-        projectionWindow?.webContents.send('pairing-pin', currentPin);
+      if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+        projectionWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?projection=true`);
+      } else {
+        projectionWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), { query: { projection: 'true' } });
       }
-    });
 
-    return true;
-  }
-  return false;
-});
+      projectionWindow.on('closed', () => {
+        projectionWindow = null;
+        mainWindow?.webContents.send('projection-state', false);
+      });
+
+      projectionWindow.webContents.on('did-finish-load', () => {
+        if (currentPeer) projectionWindow?.webContents.send('peer-connected', { address: currentPeer });
+        if (lastHelloMsg) projectionWindow?.webContents.send('control-message', lastHelloMsg);
+        if (currentPin) projectionWindow?.webContents.send('pairing-pin', currentPin);
+        if (isPaired) projectionWindow?.webContents.send('pairing-success');
+        if (lastConfigFrame) projectionWindow?.webContents.send('video-frame', lastConfigFrame);
+      });
+
+      return true;
+    }
+    return false;
+  });
+}
 
 function broadcastToWindows(channel: string, ...args: any[]) {
   if (mainWindow) {
