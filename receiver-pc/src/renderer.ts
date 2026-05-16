@@ -204,12 +204,12 @@ function applyState(state: any) {
 
   if (state.isPaired) {
     pairingEl.style.display = 'none';
-    debugLogsEl.style.display = 'none'; // Hide logs when stream starts
+    if (debugLogsEl) debugLogsEl.style.display = 'none';
     inputEnabled = true;
     statusEl.textContent = 'Authenticated. Starting stream...';
   } else {
     inputEnabled = false;
-    debugLogsEl.style.display = 'block'; // Show logs if pairing is needed
+    if (debugLogsEl) debugLogsEl.style.display = 'block';
   }
 }
 
