@@ -84,6 +84,9 @@ const createWindow = () => {
     if (ip) {
       mainWindow?.webContents.send('local-ip', `${ip}:8765`);
     }
+    if (currentPin) {
+      mainWindow?.webContents.send('pairing-pin', currentPin);
+    }
   });
 
   startNetworkServices(mainWindow);
@@ -413,6 +416,12 @@ ipcMain.handle('project-to-extended', () => {
     projectionWindow.on('closed', () => {
       projectionWindow = null;
       mainWindow?.webContents.send('projection-state', false);
+    });
+
+    projectionWindow.webContents.on('did-finish-load', () => {
+      if (currentPin) {
+        projectionWindow?.webContents.send('pairing-pin', currentPin);
+      }
     });
 
     return true;
