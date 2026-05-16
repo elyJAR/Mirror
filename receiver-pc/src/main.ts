@@ -494,11 +494,17 @@ function setupIpc() {
       });
 
       projectionWindow.webContents.on('did-finish-load', () => {
-        if (currentPeer) projectionWindow?.webContents.send('peer-connected', { address: currentPeer });
-        if (lastHelloMsg) projectionWindow?.webContents.send('control-message', lastHelloMsg);
-        if (currentPin) projectionWindow?.webContents.send('pairing-pin', currentPin);
-        if (isPaired) projectionWindow?.webContents.send('pairing-success');
-        if (lastConfigFrame) projectionWindow?.webContents.send('video-frame', lastConfigFrame);
+        // Send unified state immediately
+        projectionWindow?.webContents.send('sync-state', {
+          currentPin,
+          currentPeer,
+          isPaired,
+          lastHelloMsg
+        });
+        
+        if (lastConfigFrame) {
+          projectionWindow?.webContents.send('video-frame', lastConfigFrame);
+        }
       });
 
       return true;
