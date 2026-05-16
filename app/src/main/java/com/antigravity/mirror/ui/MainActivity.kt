@@ -227,9 +227,8 @@ class MainActivity : AppCompatActivity() {
             Log.d(TAG, "extendDisplayCard clicked. mirrorService state: ${mirrorService != null}")
             if (mirrorService != null) {
                 try {
-                    val msg = com.antigravity.mirror.stream.transport.lan.protocol.ExtendDisplayMessage()
-                    Log.d(TAG, "Sending ExtendDisplayMessage to service")
-                    mirrorService?.sendControl(msg)
+                    Log.d(TAG, "Calling mirrorService.toggleProjection()")
+                    mirrorService?.toggleProjection()
                     Toast.makeText(this, "Requesting PC projection...", Toast.LENGTH_SHORT).show()
                     extendDisplayStatus.text = "Request sent to PC"
                 } catch (e: Exception) {

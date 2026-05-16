@@ -107,6 +107,21 @@ class ProtocolClient(
         }
     }
 
+    fun sendExtendDisplay() {
+        val channel = controlWriteChannel ?: return
+        scope.launch {
+            runCatching {
+                writeMutex.withLock {
+                    val payload = json.encodeToString(ExtendDisplayMessage())
+                    Log.d(TAG, "Writing extend_display frame: $payload")
+                    channel.writeFrame(TAG_CONTROL, payload.toByteArray())
+                }
+            }.onFailure {
+                Log.e(TAG, "Failed to send extend_display: ${it.message}")
+            }
+        }
+    }
+
     /** Send a control message (JSON) to the receiver. */
     fun sendControl(msg: ControlMessage) {
         val channel = controlWriteChannel

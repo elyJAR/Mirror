@@ -141,6 +141,10 @@ private class MiracastTransportSession(
         // Miracast transport doesn't support custom control messages yet
     }
 
+    override fun toggleProjection() {
+        // Not supported on Miracast
+    }
+
     override suspend fun close(reason: String) {
         Log.i(TAG, "Closing Miracast session: $reason")
         withContext(Dispatchers.IO) {

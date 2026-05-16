@@ -83,6 +83,17 @@ class MirrorClient(context: Context) {
         }
     }
 
+    /** Request the PC to toggle the secondary projection window. */
+    fun toggleRemoteProjection() {
+        val session = activeSession
+        if (session == null) {
+            Log.w(TAG, "toggleRemoteProjection called but activeSession is null!")
+        } else {
+            Log.d(TAG, "Requesting remote projection toggle")
+            session.toggleProjection()
+        }
+    }
+
     private var discoveryJob: Job? = null
     private var sessionJob: Job? = null
     

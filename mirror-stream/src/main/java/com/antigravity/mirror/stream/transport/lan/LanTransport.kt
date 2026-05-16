@@ -107,6 +107,10 @@ private class LanTransportSession(
     override fun sendControl(message: ControlMessage) {
         client.sendControl(message)
     }
+    
+    override fun toggleProjection() {
+        client.sendExtendDisplay()
+    }
 
     override fun submitPin(pin: String) {
         client.submitPin(pin)

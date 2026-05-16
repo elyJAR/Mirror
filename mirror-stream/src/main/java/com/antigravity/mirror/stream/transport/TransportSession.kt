@@ -54,6 +54,11 @@ interface TransportSession {
     fun sendControl(message: ControlMessage)
 
     /**
+     * Requests the peer to toggle its secondary projection window.
+     */
+    fun toggleProjection()
+
+    /**
      * Cleanly terminates the session.
      *
      * @param reason Informational reason to send to the peer (if the protocol supports it).
