@@ -17,8 +17,9 @@ export interface IElectronAPI {
 declare global {
   interface Window {
     electronAPI: IElectronAPI;
+    AudioDecoder: any;
+    EncodedAudioChunk: any;
+    AudioContext: any;
+    webkitAudioContext: any;
   }
-  // WebCodecs types
-  var AudioDecoder: any;
-  var EncodedAudioChunk: any;
 }

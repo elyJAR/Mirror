@@ -63,8 +63,8 @@ window.addEventListener('keydown', (e) => {
 });
 
 let decoder: VideoDecoder | null = null;
-let audioDecoder: AudioDecoder | null = null;
-let audioCtx: AudioContext | null = null;
+let audioDecoder: any = null;
+let audioCtx: any = null;
 let nextAudioTime = 0;
 let inputEnabled = false;
 
