@@ -159,7 +159,9 @@ function startNetworkServices(window: BrowserWindow) {
   let activeSocket: net.Socket | null = null;
 
   const toggleProjection = async () => {
+    console.log('toggleProjection triggered. Current window state:', !!projectionWindow);
     if (projectionWindow) {
+      console.log('Closing existing projection window');
       projectionWindow.close();
       projectionWindow = null;
       if (mainWindow) mainWindow.webContents.send('projection-state', false);
@@ -170,15 +172,19 @@ function startNetworkServices(window: BrowserWindow) {
     }
 
     const displays = screen.getAllDisplays();
+    console.log(`Found ${displays.length} displays`);
     if (displays.length < 2) {
-      console.log('No extended display found');
+      console.log('No extended display found (displays.length < 2)');
+      // For testing, we could allow projecting to the primary display if it's the only one,
+      // but the requirements say "secondary monitor".
       return false;
     }
 
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const extendedDisplay = displays.find((d: Electron.Display) => d.id !== primaryDisplay.id) || displays[1];
+    try {
+      const primaryDisplay = screen.getPrimaryDisplay();
+      const extendedDisplay = displays.find((d: Electron.Display) => d.id !== primaryDisplay.id) || displays[1];
 
-    console.log('Opening projection window on display:', extendedDisplay.id);
+      console.log('Opening projection window on display:', extendedDisplay.id, 'bounds:', extendedDisplay.bounds);
 
     projectionWindow = new BrowserWindow({
       x: extendedDisplay.bounds.x,
@@ -228,6 +234,10 @@ function startNetworkServices(window: BrowserWindow) {
       sendControl(activeSocket, { type: 'projection_state', active: isProjecting });
     }
     return isProjecting;
+    } catch (e) {
+      console.error('Failed to toggle projection:', e);
+      return false;
+    }
   };
 
   ipcMain.handle('project-to-extended', toggleProjection);
@@ -338,15 +348,16 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
   }
   if (tag === 0x01) { // Control Message (JSON)
     try {
-      const raw = payload.toString();
+      const raw = payload.toString().trim();
+      console.log('[TCP] Raw control payload:', raw);
       const msg = JSON.parse(raw);
-      // ... (inferredType logic remains the same)
+      
       const inferredType =
         typeof msg.type === 'string'
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
       
-      console.log('Control Message:', inferredType, msg);
+      console.log('Control Message Inferred Type:', inferredType);
       
       if (mainWindow) mainWindow.webContents.send('control-message', msg);
       if (projectionWindow) projectionWindow.webContents.send('control-message', msg);
