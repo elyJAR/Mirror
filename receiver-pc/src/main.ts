@@ -93,66 +93,66 @@ const createWindow = () => {
   createTray();
 };
 
-function createTray() {
-  const refreshTray = () => {
-    const ip = getLocalIpAddress() || 'Unknown IP';
-    
-    console.log('[Tray] Creating tray. Searching for icon...');
-    
-    const possiblePaths = [
-      path.join(app.getAppPath(), 'src', 'assets', 'tray-icon.png'),
-      path.join(process.resourcesPath, 'src', 'assets', 'tray-icon.png'),
-      path.join(process.resourcesPath, 'assets', 'tray-icon.png'),
-      path.join(__dirname, '..', 'src', 'assets', 'tray-icon.png')
-    ];
+function refreshTray() {
+  const ip = getLocalIpAddress() || 'Unknown IP';
+  
+  const possiblePaths = [
+    path.join(app.getAppPath(), 'src', 'assets', 'tray-icon.png'),
+    path.join(process.resourcesPath, 'src', 'assets', 'tray-icon.png'),
+    path.join(process.resourcesPath, 'assets', 'tray-icon.png'),
+    path.join(__dirname, '..', 'src', 'assets', 'tray-icon.png')
+  ];
 
-    let icon = nativeImage.createEmpty();
-    for (const p of possiblePaths) {
-      const img = nativeImage.createFromPath(p);
-      if (!img.isEmpty()) {
-        console.log('[Tray] Found icon at:', p);
-        icon = img;
-        break;
+  let icon = nativeImage.createEmpty();
+  for (const p of possiblePaths) {
+    const img = nativeImage.createFromPath(p);
+    if (!img.isEmpty()) {
+      icon = img;
+      break;
+    }
+  }
+  
+  if (icon.isEmpty()) {
+    icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXcF5yXzUAAABWSURBVBgZ7c6xCQAgDMTAs99fT8AhfIuC/+78EFEuX993LidIAYJFAAAAABJRU5ErkJggg==');
+  }
+  
+  const trayIcon = icon.resize({ width: 16, height: 16 });
+
+  if (!tray) {
+    tray = new Tray(trayIcon);
+  } else {
+    tray.setImage(trayIcon);
+  }
+
+  const contextMenu = Menu.buildFromTemplate([
+    { label: `Mirror Receiver Active`, enabled: false },
+    { label: `Local IP: ${ip}`, enabled: false },
+    { label: 'Copy IP Address', click: () => {
+      if (ip !== 'Unknown IP') {
+        clipboard.writeText(ip);
       }
-    }
-    
-    if (icon.isEmpty()) {
-      console.warn('[Tray] All icon paths failed. Using colored fallback.');
-      // Fallback: A bright blue circle (base64) to ensure visibility
-      icon = nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAACBjSFJNAAB6JgAAgIQAAPoAAACA6AAAdTAAAOpgAAA6mAAAF3CculE8AAAACXBIWXMAAAsTAAALEwEAmpwYAAAAIGNIUk0AAHolAACAgwAA+f8AAIDpAAB1MAAA6mAAADqYAAAXcF5yXzUAAABWSURBVBgZ7c6xCQAgDMTAs99fT8AhfIuC/+78EFEuX993LidIAYJFAAAAABJRU5ErkJggg==');
-    }
-    
-    const trayIcon = icon.resize({ width: 16, height: 16 });
+    }},
+    { type: 'separator' },
+    { label: 'Show Receiver', click: () => {
+      mainWindow?.show();
+      mainWindow?.focus();
+    }},
+    { label: currentPin ? `Pairing PIN: ${currentPin}` : 'No active pairing', enabled: !!currentPin, click: () => {
+      if (currentPin) clipboard.writeText(currentPin);
+    }},
+    { type: 'separator' },
+    { label: 'Quit Mirror', click: () => {
+      isQuitting = true;
+      app.quit();
+    }}
+  ]);
+  
+  const status = currentPin ? `Waiting for PIN (${currentPin})` : 'Waiting for connection';
+  tray.setToolTip(`Mirror Receiver\nIP: ${ip}\nStatus: ${status}`);
+  tray.setContextMenu(contextMenu);
+}
 
-    if (!tray) {
-      tray = new Tray(trayIcon);
-    } else {
-      tray.setImage(trayIcon);
-    }
-
-    const contextMenu = Menu.buildFromTemplate([
-      { label: `Mirror Receiver Active`, enabled: false },
-      { label: `Local IP: ${ip}`, enabled: false },
-      { label: 'Copy IP Address', click: () => {
-        if (ip !== 'Unknown IP') {
-          clipboard.writeText(ip);
-        }
-      }},
-      { type: 'separator' },
-      { label: 'Show Receiver', click: () => {
-        mainWindow?.show();
-        mainWindow?.focus();
-      }},
-      { label: 'Quit Mirror', click: () => {
-        isQuitting = true;
-        app.quit();
-      }}
-    ]);
-    
-    tray.setToolTip(`Mirror Receiver\nIP: ${ip}\nStatus: Waiting for connection`);
-    tray.setContextMenu(contextMenu);
-  };
-
+function createTray() {
   refreshTray();
   
   // Periodically refresh IP in case of network changes
@@ -186,6 +186,7 @@ function startNetworkServices(window: BrowserWindow) {
     currentPin = Math.floor(1000 + Math.random() * 9000).toString();
     console.log('New connection from', remoteAddress, 'PIN:', currentPin);
     
+    refreshTray();
     broadcastToWindows('peer-connected', { address: remoteAddress });
     broadcastToWindows('pairing-pin', currentPin);
     
@@ -239,6 +240,8 @@ function startNetworkServices(window: BrowserWindow) {
 
     socket.on('close', () => {
       console.log('Phone disconnected');
+      currentPin = '';
+      refreshTray();
       broadcastToWindows('peer-disconnected');
       ipcMain.removeHandler('send-control'); // Cleanup handler
     });
@@ -320,6 +323,8 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         
         if (isMatch) {
           trustedDevices.add(socket.remoteAddress || 'unknown');
+          currentPin = '';
+          refreshTray();
           broadcastToWindows('pairing-success');
         } else {
           if (onPinFailure()) {
