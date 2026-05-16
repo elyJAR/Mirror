@@ -210,6 +210,11 @@ function startNetworkServices(window: BrowserWindow) {
       if (currentPeerAddress) {
         projectionWindow?.webContents.send('peer-connected', { address: currentPeerAddress });
       }
+      // Request a keyframe so the new window gets the parameter sets (SPS/PPS) immediately
+      if (activeSocket && !activeSocket.destroyed) {
+        console.log('Requesting keyframe for new projection window...');
+        sendControl(activeSocket, { type: 'request-keyframe' });
+      }
     });
 
     projectionWindow.on('closed', () => {
