@@ -126,10 +126,12 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
                 // Feed into MediaCodec
                 val inputIndex = codec?.dequeueInputBuffer(10000) ?: -1
                 if (inputIndex >= 0) {
-                    val inputBuffer = codec?.getInputBuffer(inputIndex)!!
-                    inputBuffer.clear()
-                    inputBuffer.put(pcmBuffer, 0, readSize)
-                    codec?.queueInputBuffer(inputIndex, 0, readSize, System.nanoTime() / 1000, 0)
+                    val inputBuffer = codec?.getInputBuffer(inputIndex)
+                    if (inputBuffer != null) {
+                        inputBuffer.clear()
+                        inputBuffer.put(pcmBuffer, 0, readSize)
+                        codec?.queueInputBuffer(inputIndex, 0, readSize, System.nanoTime() / 1000, 0)
+                    }
                 }
 
                 // Drain MediaCodec
@@ -137,10 +139,12 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
                 while (outputIndex >= 0) {
                     val isCodecConfig = (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0
                     if (!isCodecConfig && bufferInfo.size > 0) {
-                        val outputBuffer = codec?.getOutputBuffer(outputIndex)!!
-                        val data = ByteArray(bufferInfo.size)
-                        outputBuffer.get(data)
-                        onAudioData(data, bufferInfo.presentationTimeUs)
+                        val outputBuffer = codec?.getOutputBuffer(outputIndex)
+                        if (outputBuffer != null) {
+                            val data = ByteArray(bufferInfo.size)
+                            outputBuffer.get(data)
+                            onAudioData(data, bufferInfo.presentationTimeUs)
+                        }
                     }
                     codec?.releaseOutputBuffer(outputIndex, false)
                     outputIndex = codec?.dequeueOutputBuffer(bufferInfo, 0) ?: -1
