@@ -175,27 +175,38 @@ window.electronAPI.onAudioFrame((payload: Uint8Array) => {
 });
 
 // Initial setup
-initDecoder();
-statusEl.textContent = 'Waiting for phone...';
-statusEl.style.display = 'block';
-hudEl.style.display = 'block';
+try {
+  initDecoder();
+  statusEl.textContent = 'Waiting for phone...';
+  statusEl.style.display = 'block';
+  hudEl.style.display = 'block';
+  logToScreen('Renderer initialized');
+} catch (e) {
+  logToScreen(`Init error: ${e}`);
+}
 
-// Fetch initial state
-logToScreen('Fetching initial state...');
-window.electronAPI.getPairingState().then((state: any) => {
-  logToScreen(`Initial state: peer=${state.currentPeer}, paired=${state.isPaired}, pin=${state.currentPin}`);
-  if (state.currentPin) {
-    pinEl.textContent = state.currentPin;
-    pairingEl.style.display = 'block';
-  }
-  if (state.currentPeer) {
-    peerEl.textContent = state.currentPeer;
-  }
-  if (state.isPaired) {
-    pairingEl.style.display = 'none';
-    inputEnabled = true;
-  }
-});
+// Fetch initial state with a slight delay
+setTimeout(() => {
+  logToScreen('Attempting to fetch pairing state...');
+  window.electronAPI.getPairingState()
+    .then((state: any) => {
+      logToScreen(`State fetched: peer=${state.currentPeer}, pin=${state.currentPin}, paired=${state.isPaired}`);
+      if (state.currentPin) {
+        pinEl.textContent = state.currentPin;
+        pairingEl.style.display = 'block';
+      }
+      if (state.currentPeer) {
+        peerEl.textContent = state.currentPeer;
+      }
+      if (state.isPaired) {
+        pairingEl.style.display = 'none';
+        inputEnabled = true;
+      }
+    })
+    .catch((err: any) => {
+      logToScreen(`Fetch error: ${err}`);
+    });
+}, 500);
 
 // --- IPC Event Handlers ---
 
