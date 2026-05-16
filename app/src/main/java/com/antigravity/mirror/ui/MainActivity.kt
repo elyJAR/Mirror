@@ -257,7 +257,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun setupLatencyToggles() {
-        val prefs = getSharedPreferences("mirror_settings", MODE_PRIVATE)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val modeStr = prefs.getString("latency_mode", "BALANCED") ?: "BALANCED"
         val mode = com.antigravity.mirror.stream.api.LatencyMode.valueOf(modeStr)
         updateLatencyUI(mode)
@@ -299,7 +299,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun saveLatencyMode(mode: com.antigravity.mirror.stream.api.LatencyMode) {
-        getSharedPreferences("mirror_settings", MODE_PRIVATE).edit()
+        PreferenceManager.getDefaultSharedPreferences(this).edit()
             .putString("latency_mode", mode.name)
             .apply()
         updateServiceConfig()
@@ -322,7 +322,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateServiceConfig() {
-        val prefs = getSharedPreferences("mirror_settings", MODE_PRIVATE)
+        val prefs = PreferenceManager.getDefaultSharedPreferences(this)
         val modeStr = prefs.getString("latency_mode", "BALANCED") ?: "BALANCED"
         val mode = com.antigravity.mirror.stream.api.LatencyMode.valueOf(modeStr)
         
