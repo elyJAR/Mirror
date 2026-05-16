@@ -214,8 +214,12 @@ class ProtocolClient(
             while (true) {
                 val frame = readChannel.readFrame()
                 if (frame.tag == TAG_CONTROL) {
-                    val msg = json.decodeFromString<ControlMessage>(String(frame.payload))
-                    handleControlMessage(msg)
+                    try {
+                        val msg = json.decodeFromString<ControlMessage>(String(frame.payload))
+                        handleControlMessage(msg)
+                    } catch (e: Exception) {
+                        Log.w(TAG, "Failed to decode control message: ${e.message}")
+                    }
                 } else if (frame.tag == TAG_VIDEO) {
                     // Receiver shouldn't send video, but we ignore it if it does
                     Log.w(TAG, "Received unexpected video frame from receiver")
