@@ -2,6 +2,7 @@ package com.antigravity.mirror.stream.transport.lan
 
 import android.content.Context
 import com.antigravity.mirror.stream.api.MirrorConfig
+import com.antigravity.mirror.stream.media.AudioFrame
 import com.antigravity.mirror.stream.media.NalUnit
 import com.antigravity.mirror.stream.transport.*
 import com.antigravity.mirror.stream.transport.lan.discovery.LanDiscoveryManager
@@ -45,7 +46,7 @@ private class LanTransportSession(
     private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val videoSink = Channel<NalUnit>(capacity = 30)
-    override val audioSink = Channel<ByteArray>(capacity = 60)
+    override val audioSink = Channel<AudioFrame>(capacity = 60)
     override val stats: Flow<com.antigravity.mirror.stream.api.SessionStats> = client.stats
     override val negotiatedCodec: String = client.negotiatedCodec
     override val pairingRequired: Boolean

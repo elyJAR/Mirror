@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.antigravity.mirror.stream.api.MirrorConfig
 import com.antigravity.mirror.stream.api.MirrorError
+import com.antigravity.mirror.stream.media.AudioFrame
 import com.antigravity.mirror.stream.media.NalUnit
 import com.antigravity.mirror.stream.transport.lan.protocol.ControlMessage
 import com.antigravity.mirror.stream.transport.*
@@ -80,7 +81,7 @@ private class MiracastTransportSession(
     private val sessionScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val videoSink = Channel<NalUnit>(capacity = 30)
-    override val audioSink = Channel<ByteArray>(capacity = 60)
+    override val audioSink = Channel<AudioFrame>(capacity = 60)
     override val negotiatedCodec: String = "video/avc"
     override val pairingRequired: Boolean = false
     override val stats: Flow<com.antigravity.mirror.stream.api.SessionStats> = emptyFlow()
