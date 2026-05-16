@@ -131,10 +131,15 @@ function initAudio() {
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
-      // Simple direct playback - if nextAudioTime is in the past, catch up to now
+      // Smooth playback with a small 30ms jitter buffer
       const now = audioCtx.currentTime;
+      const bufferPadding = 0.03; // 30ms
+
       if (nextAudioTime < now) {
-        nextAudioTime = now;
+        nextAudioTime = now + bufferPadding;
+      } else if (nextAudioTime > now + 0.2) {
+        // If we are more than 200ms ahead, force a sync to reduce latency
+        nextAudioTime = now + bufferPadding;
       }
 
       source.start(nextAudioTime);
