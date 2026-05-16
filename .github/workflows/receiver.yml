@@ -39,3 +39,16 @@ jobs:
           name: receiver-pc-windows
           path: receiver-pc/out/make/**/*.exe
           retention-days: 14
+
+      - name: Create GitHub Pre-release and upload EXE
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/receiver-pc/')
+        with:
+          name: "Mirror Receiver ${{ github.ref_name }}"
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: true
+          generate_release_notes: true
+          files: |
+            receiver-pc/out/make/**/*.exe
+

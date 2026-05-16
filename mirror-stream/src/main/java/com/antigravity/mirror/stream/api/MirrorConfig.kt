@@ -16,10 +16,10 @@ package com.antigravity.mirror.stream.api
  * @property transport which network transport to use; see [TransportPreference].
  */
 data class MirrorConfig(
-    val width: Int = 1280,
-    val height: Int = 720,
+    val width: Int = 1920,
+    val height: Int = 1080,
     val fps: Int = 30,
-    val bitrateBps: Int = 8_000_000,
+    val bitrateBps: Int = 12_000_000,
     val codec: Codec = Codec.H264_BASELINE,
     val transport: TransportPreference = TransportPreference.AUTO,
 )

@@ -12,7 +12,8 @@ private const val MIME_TYPE = "audio/mp4a-latm" // AAC
 private const val SAMPLE_RATE = 44100
 private const val CHANNEL_COUNT = 2
 private const val BITRATE = 128000
-private const val BUFFER_SIZE_FACTOR = 2
+private const val BUFFER_SIZE_FACTOR = 4 // Increased for better headroom
+private const val PCM_BUFFER_SIZE = 8192 // Increased chunk size to 8KB (approx 46ms)
 
 /**
  * Captures system audio via [MediaProjection] and encodes it to AAC.
@@ -80,6 +81,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
 
             // 3. Start Loop
             encodingThread = Thread({
+                android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
                 runLoop(onAudioData)
             }, "AudioEncoder-Thread").apply { start() }
             
@@ -92,7 +94,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
 
     private fun runLoop(onAudioData: (ByteArray, Long) -> Unit) {
         val bufferInfo = MediaCodec.BufferInfo()
-        val pcmBuffer = ByteArray(4096) // 4KB chunks
+        val pcmBuffer = ByteArray(PCM_BUFFER_SIZE)
 
         try {
             while (isRunning) {
@@ -100,6 +102,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
                 val readSize = audioRecord?.read(pcmBuffer, 0, pcmBuffer.size) ?: -1
                 if (readSize <= 0) {
                     if (!isRunning) break
+                    Thread.yield()
                     continue
                 }
 

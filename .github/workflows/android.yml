@@ -104,26 +104,21 @@ jobs:
       - name: Run unit tests
         run: ./gradlew test --stacktrace
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
-
-      - name: Build release APK (unsigned)
+      - name: Build release APK (signed)
         run: ./gradlew assembleRelease --stacktrace
 
-      - name: Rename APKs with version tag
+      - name: Rename APK with version tag
         run: |
           VERSION="${{ github.ref_name }}"
-          cp app/build/outputs/apk/debug/app-debug.apk   "Mirror-${VERSION}-debug.apk"
-          cp app/build/outputs/apk/release/app-release.apk "Mirror-${VERSION}-release.apk"
+          cp app/build/outputs/apk/release/app-release.apk "Mirror-${VERSION}.apk"
 
-      - name: Create GitHub Release and upload APKs
+      - name: Create GitHub Pre-release and upload APK
         uses: softprops/action-gh-release@v2
         with:
           name: "Mirror ${{ github.ref_name }}"
           tag_name: ${{ github.ref_name }}
           draft: false
-          prerelease: ${{ contains(github.ref_name, '-') }}   # tags like v1.0.0-beta are pre-releases
+          prerelease: true
           generate_release_notes: true
           files: |
-            Mirror-${{ github.ref_name }}-debug.apk
-            Mirror-${{ github.ref_name }}-release.apk
+            Mirror-${{ github.ref_name }}.apk
