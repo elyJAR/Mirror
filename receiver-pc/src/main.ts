@@ -88,6 +88,9 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
+  // Open DevTools by default to help troubleshoot the blank screen
+  mainWindow.webContents.openDevTools({ mode: 'detach' });
+
   // Handle window close (hide instead of quit)
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
@@ -505,6 +508,9 @@ function setupIpc() {
 }
 
 function broadcastToWindows(channel: string, ...args: any[]) {
+  if (channel !== 'video-frame' && channel !== 'audio-frame') {
+    console.log(`Broadcasting ${channel} to ${mainWindow ? 'Main' : 'None'} and ${projectionWindow ? 'Projection' : 'None'}`);
+  }
   if (mainWindow) {
     mainWindow.webContents.send(channel, ...args);
   }
