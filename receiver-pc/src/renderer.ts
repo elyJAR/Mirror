@@ -25,6 +25,7 @@ const pinEl = document.getElementById('pin')!;
 const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
 const btnRefresh = document.getElementById('btnRefresh') as HTMLButtonElement;
 const audioStatusEl = document.getElementById('audio-status')!;
+const canvas = document.getElementById('videoCanvas') as HTMLCanvasElement;
 
 const isProjection = new URLSearchParams(window.location.search).get('projection') === 'true';
 
@@ -44,7 +45,7 @@ function updateProjectionUI(isProjecting: boolean) {
   btnProject.style.backgroundColor = isProjecting ? '#ff4444' : '';
 }
 
-window.electronAPI.onProjectionState((isProjecting) => {
+window.electronAPI.onProjectionState((isProjecting: boolean) => {
   updateProjectionUI(isProjecting);
 });
 
@@ -110,7 +111,7 @@ function initAudio() {
   }
 
   audioDecoder = new window.AudioDecoder({
-    output: (data) => {
+    output: (data: any) => {
       if (!audioCtx) return;
 
       const buffer = audioCtx.createBuffer(
@@ -147,7 +148,7 @@ function initAudio() {
 
       data.close();
     },
-    error: (e) => console.error('AudioDecoder error:', e),
+    error: (e: Error) => console.error('AudioDecoder error:', e),
   });
 
   // AudioSpecificConfig for AAC-LC, 44100 Hz, stereo:
@@ -302,13 +303,12 @@ window.electronAPI.onControlMessage((msg) => {
 
 // Click anywhere to enable audio (browser requirement)
 document.addEventListener('click', () => {
-  if (audioContext?.state === 'suspended') {
-    audioContext.resume();
+  if (audioCtx?.state === 'suspended') {
+    audioCtx.resume();
   }
-  if (!audioInitialized) {
-    initAudio().then(() => {
-      logToScreen('Audio initialized via user click');
-    });
+  if (!audioDecoder || audioDecoder.state === 'closed') {
+    initAudio();
+    logToScreen('Audio initialization attempted via user click');
   }
 }, { once: false });
 
@@ -397,15 +397,15 @@ setInterval(() => {
 
 // --- Touch-back (Input Injection) ---
 
-canvas.addEventListener('mousedown', (e) => {
+canvas.addEventListener('mousedown', (e: MouseEvent) => {
   sendTouch(0, e);
 });
 
-canvas.addEventListener('mouseup', (e) => {
+canvas.addEventListener('mouseup', (e: MouseEvent) => {
   sendTouch(1, e);
 });
 
-canvas.addEventListener('mousemove', (e) => {
+canvas.addEventListener('mousemove', (e: MouseEvent) => {
   if (e.buttons > 0) {
     sendTouch(2, e);
   }
