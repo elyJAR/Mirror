@@ -450,7 +450,7 @@ function setupIpc() {
     };
   });
 
-  ipcMain.handle('send-control', async (_event, msg) => {
+  ipcMain.handle('send-control', async (_, msg) => {
     if (activeSocket && !activeSocket.destroyed) {
       sendControl(activeSocket, msg);
     }

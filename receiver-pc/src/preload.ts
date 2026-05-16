@@ -7,32 +7,32 @@ import { contextBridge, ipcRenderer } from 'electron';
  */
 contextBridge.exposeInMainWorld('electronAPI', {
   // Listeners for events from Main process
-  onControlMessage: (callback: (msg: any) => void) => 
-    ipcRenderer.on('control-message', (_event, value) => callback(value)),
+  onControlMessage: (callback: (msg: unknown) => void) => 
+    ipcRenderer.on('control-message', (_, value) => callback(value)),
     
   onVideoFrame: (callback: (frame: Uint8Array) => void) => 
-    ipcRenderer.on('video-frame', (_event, value) => callback(value)),
+    ipcRenderer.on('video-frame', (_, value) => callback(value)),
 
   onAudioFrame: (callback: (frame: Uint8Array) => void) =>
-    ipcRenderer.on('audio-frame', (_event, value) => callback(value)),
+    ipcRenderer.on('audio-frame', (_, value) => callback(value)),
     
   onPeerConnected: (callback: (peer: { address: string }) => void) =>
-    ipcRenderer.on('peer-connected', (_event, value) => callback(value)),
+    ipcRenderer.on('peer-connected', (_, value) => callback(value)),
 
   onPairingPin: (callback: (pin: string) => void) =>
-    ipcRenderer.on('pairing-pin', (_event, value) => callback(value)),
+    ipcRenderer.on('pairing-pin', (_, value) => callback(value)),
 
   onLocalIp: (callback: (ip: string) => void) =>
-    ipcRenderer.on('local-ip', (_event, value) => callback(value)),
+    ipcRenderer.on('local-ip', (_, value) => callback(value)),
 
   onPairingSuccess: (callback: () => void) =>
-    ipcRenderer.on('pairing-success', (_event) => callback()),
+    ipcRenderer.on('pairing-success', () => callback()),
     
   onProjectionState: (callback: (isProjecting: boolean) => void) =>
-    ipcRenderer.on('projection-state', (_event, value) => callback(value)),
+    ipcRenderer.on('projection-state', (_, value) => callback(value)),
 
   onSyncState: (callback: (state: any) => void) =>
-    ipcRenderer.on('sync-state', (_event, value) => callback(value)),
+    ipcRenderer.on('sync-state', (_, value) => callback(value)),
 
   // Actions to send to Main process
   sendControl: (msg: any) => ipcRenderer.invoke('send-control', msg),
