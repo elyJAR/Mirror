@@ -301,7 +301,7 @@ function startNetworkServices(window: BrowserWindow) {
   // Keep-alive heartbeat to prevent phone from resetting to Scanning state
   setInterval(() => {
     if (activeSocket && !activeSocket.destroyed && isPaired) {
-      sendControl(activeSocket, { type: 'heartbeat', status: 'streaming' });
+      sendControl(activeSocket, { type: 'ping', timestamp: Date.now() });
     }
   }, 5000);
 
