@@ -5,6 +5,7 @@ import android.util.Log
 import com.antigravity.mirror.stream.api.MirrorConfig
 import com.antigravity.mirror.stream.api.MirrorError
 import com.antigravity.mirror.stream.media.NalUnit
+import com.antigravity.mirror.stream.transport.lan.protocol.ControlMessage
 import com.antigravity.mirror.stream.transport.*
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
@@ -134,6 +135,10 @@ private class MiracastTransportSession(
 
     override fun submitPin(pin: String) {
         // Miracast uses WPS/PBC, not application-layer PINs
+    }
+
+    override fun sendControl(message: ControlMessage) {
+        // Miracast transport doesn't support custom control messages yet
     }
 
     override suspend fun close(reason: String) {
