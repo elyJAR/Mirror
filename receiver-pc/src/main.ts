@@ -501,6 +501,11 @@ function setupIpc() {
         projectionWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), { query: { projection: 'true' } });
       }
 
+      // Force a keyframe so the new window starts decoding immediately
+      if (activeSocket) {
+        sendControl(activeSocket, { type: 'request-keyframe' });
+      }
+
       projectionWindow.on('closed', () => {
         projectionWindow = null;
         mainWindow?.webContents.send('projection-state', false);
