@@ -69,6 +69,8 @@ const createWindow = () => {
     },
   });
 
+  mainWindow.setMenuBarVisibility(false);
+
   // Load the renderer app (Vite dev server or static build)
   if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
     mainWindow.loadURL(MAIN_WINDOW_VITE_DEV_SERVER_URL);
