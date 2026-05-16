@@ -249,7 +249,16 @@ class MainActivity : AppCompatActivity() {
 
         discoverButton.setOnClickListener  { onDiscoverClicked() }
         disconnectButton.setOnClickListener { onDisconnectClicked() }
-        pauseButton.setOnClickListener     { /* pause TBD */ }
+        pauseButton.setOnClickListener {
+            val isStreaming = mirrorService?.getState()?.value is MirrorState.Streaming
+            if (isStreaming) {
+                mirrorService?.pause()
+                pauseButton.setImageResource(R.drawable.ic_play)
+            } else {
+                mirrorService?.resume()
+                pauseButton.setImageResource(R.drawable.ic_pause)
+            }
+        }
         retryButton.setOnClickListener     { onDiscoverClicked() }
 
         streamStatsHud.setOnLongClickListener {
@@ -441,7 +450,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun startStreamTimer(targetName: String) {
-        streamStartMs = System.currentTimeMillis()
+        streamStartMs = mirrorService?.getStreamStartMs() ?: System.currentTimeMillis()
         streamTargetName.text = targetName
         streamTimerTask?.cancel()
         streamTimerTask = Timer().also { timer ->

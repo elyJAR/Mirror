@@ -142,9 +142,12 @@ class MirrorService : Service() {
         Log.i(TAG, "client.onProjectionGranted() returned")
     }
     fun disconnect() = client.disconnect()
+    fun pause() = client.pause()
+    fun resume() = client.resume()
     fun submitPin(pin: String) = client.submitPin(pin)
     fun getState(): StateFlow<MirrorState> = client.state
     fun getStats(): StateFlow<com.antigravity.mirror.stream.api.SessionStats> = client.stats
+    fun getStreamStartMs(): Long = client.getStreamStartMs()
 
     // --- Foreground Support ---
 

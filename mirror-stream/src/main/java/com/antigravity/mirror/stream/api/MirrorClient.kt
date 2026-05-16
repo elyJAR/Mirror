@@ -81,6 +81,19 @@ class MirrorClient(context: Context) {
     
     private var currentBitrateBps = 0
     private var highQueueStartTime = 0L
+    private var streamStartMs = 0L
+
+    fun getStreamStartMs() = streamStartMs
+
+    fun pause() {
+        captureEngine?.stop()
+        // We stay in Streaming state but stop sending frames
+    }
+
+    fun resume() {
+        val config = lastConfig ?: MirrorConfig()
+        captureEngine?.start(config.width, config.height, 160)
+    }
 
     /** Begin discovering receivers across both transports. */
     fun startDiscovery() {
@@ -295,6 +308,7 @@ class MirrorClient(context: Context) {
                 capture.start(config.width, config.height, 160)
                 Log.d(TAG, "Screen capture started successfully")
                 Log.i(TAG, "Media pipeline initialized, transitioning to Streaming state")
+                streamStartMs = System.currentTimeMillis()
                 _state.value = MirrorState.Streaming
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to initialize media pipeline: ${e.message}", e)
