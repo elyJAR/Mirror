@@ -32,4 +32,15 @@
         <item>miracast</item>
         <item>lan</item>
     </string-array>
+
+    <string-array name="latency_entries">
+        <item>Speed (Low Latency)</item>
+        <item>Balanced (Recommended)</item>
+        <item>Quality (High Fidelity)</item>
+    </string-array>
+    <string-array name="latency_values">
+        <item>LOW</item>
+        <item>BALANCED</item>
+        <item>QUALITY</item>
+    </string-array>
 </resources>

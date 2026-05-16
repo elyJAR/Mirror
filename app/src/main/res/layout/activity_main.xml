@@ -621,6 +621,67 @@
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
+                <!-- Performance Mode while streaming -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="24dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="STREAM PERFORMANCE"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true" />
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Mirror.CardView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+                    
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/latencyToggleGroupStreaming"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="4dp"
+                        app:singleSelection="true"
+                        app:selectionRequired="true">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnLowLatencyStreaming"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Speed"
+                            android:textSize="12sp"
+                            android:textColor="@color/kg_text_primary"
+                            app:strokeColor="@color/kg_border" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnBalancedStreaming"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Balanced"
+                            android:textSize="12sp"
+                            android:textColor="@color/kg_text_primary"
+                            app:strokeColor="@color/kg_border" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnHighQualityStreaming"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Quality"
+                            android:textSize="12sp"
+                            android:textColor="@color/kg_text_primary"
+                            app:strokeColor="@color/kg_border" />
+
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+                </com.google.android.material.card.MaterialCardView>
+
                 <!-- Pause / Stop buttons -->
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/pauseButton"

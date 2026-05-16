@@ -32,4 +32,14 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory app:title="Performance">
+        <ListPreference
+            app:defaultValue="BALANCED"
+            app:entries="@array/latency_entries"
+            app:entryValues="@array/latency_values"
+            app:key="latency_mode"
+            app:title="Latency Mode"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+
 </PreferenceScreen>

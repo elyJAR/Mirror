@@ -101,6 +101,9 @@ class MainActivity : AppCompatActivity() {
     private var hudVisible = false
     private var lastStats: SessionStats? = null
 
+    private lateinit var latencyToggleGroup: com.google.android.material.button.MaterialButtonToggleGroup
+    private lateinit var latencyToggleGroupStreaming: com.google.android.material.button.MaterialButtonToggleGroup
+
     // -------------------------------------------------------------------------
     // Service binding
     // -------------------------------------------------------------------------
@@ -246,7 +249,87 @@ class MainActivity : AppCompatActivity() {
             true
         }
 
+        latencyToggleGroup = findViewById(R.id.latencyToggleGroup)
+        latencyToggleGroupStreaming = findViewById(R.id.latencyToggleGroupStreaming)
+        setupLatencyToggles()
+
         checkAndRequestPermissions()
+    }
+
+    private fun setupLatencyToggles() {
+        val prefs = getSharedPreferences("mirror_settings", MODE_PRIVATE)
+        val modeStr = prefs.getString("latency_mode", "BALANCED") ?: "BALANCED"
+        val mode = com.antigravity.mirror.stream.api.LatencyMode.valueOf(modeStr)
+        updateLatencyUI(mode)
+
+        latencyToggleGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                val newMode = when (checkedId) {
+                    R.id.btnLowLatency -> com.antigravity.mirror.stream.api.LatencyMode.LOW
+                    R.id.btnHighQuality -> com.antigravity.mirror.stream.api.LatencyMode.QUALITY
+                    else -> com.antigravity.mirror.stream.api.LatencyMode.BALANCED
+                }
+                saveLatencyMode(newMode)
+                updateLatencyUI(newMode)
+            }
+        }
+
+        latencyToggleGroupStreaming.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (isChecked) {
+                val newMode = when (checkedId) {
+                    R.id.btnLowLatencyStreaming -> com.antigravity.mirror.stream.api.LatencyMode.LOW
+                    R.id.btnHighQualityStreaming -> com.antigravity.mirror.stream.api.LatencyMode.QUALITY
+                    else -> com.antigravity.mirror.stream.api.LatencyMode.BALANCED
+                }
+                saveLatencyMode(newMode)
+                updateLatencyUI(newMode)
+            }
+        }
+        
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
+        if (key == "latency_mode") {
+            val modeStr = sharedPreferences.getString("latency_mode", "BALANCED") ?: "BALANCED"
+            val mode = com.antigravity.mirror.stream.api.LatencyMode.valueOf(modeStr)
+            updateLatencyUI(mode)
+            updateServiceConfig()
+        }
+    }
+
+    private fun saveLatencyMode(mode: com.antigravity.mirror.stream.api.LatencyMode) {
+        getSharedPreferences("mirror_settings", MODE_PRIVATE).edit()
+            .putString("latency_mode", mode.name)
+            .apply()
+        updateServiceConfig()
+    }
+
+    private fun updateLatencyUI(mode: com.antigravity.mirror.stream.api.LatencyMode) {
+        val homeId = when (mode) {
+            com.antigravity.mirror.stream.api.LatencyMode.LOW -> R.id.btnLowLatency
+            com.antigravity.mirror.stream.api.LatencyMode.QUALITY -> R.id.btnHighQuality
+            else -> R.id.btnBalanced
+        }
+        val streamId = when (mode) {
+            com.antigravity.mirror.stream.api.LatencyMode.LOW -> R.id.btnLowLatencyStreaming
+            com.antigravity.mirror.stream.api.LatencyMode.QUALITY -> R.id.btnHighQualityStreaming
+            else -> R.id.btnBalancedStreaming
+        }
+        
+        latencyToggleGroup.check(homeId)
+        latencyToggleGroupStreaming.check(streamId)
+    }
+
+    private fun updateServiceConfig() {
+        val prefs = getSharedPreferences("mirror_settings", MODE_PRIVATE)
+        val modeStr = prefs.getString("latency_mode", "BALANCED") ?: "BALANCED"
+        val mode = com.antigravity.mirror.stream.api.LatencyMode.valueOf(modeStr)
+        
+        val config = com.antigravity.mirror.stream.api.MirrorConfig(
+            latencyMode = mode
+        )
+        mirrorService?.setConfig(config)
     }
 
     override fun onStart() {
