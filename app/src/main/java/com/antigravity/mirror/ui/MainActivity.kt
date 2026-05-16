@@ -6,6 +6,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.SharedPreferences
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
@@ -62,7 +63,6 @@ class MainActivity : AppCompatActivity() {
 
     // Home panel
     private lateinit var discoverButton: Button
-    private lateinit var latencyToggleGroup: com.google.android.material.button.MaterialButtonToggleGroup
 
     // Scanning panel
     private lateinit var progressBar: ProgressBar
