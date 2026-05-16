@@ -129,8 +129,9 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
                     val inputBuffer = codec?.getInputBuffer(inputIndex)
                     if (inputBuffer != null) {
                         inputBuffer.clear()
-                        inputBuffer.put(pcmBuffer, 0, readSize)
-                        codec?.queueInputBuffer(inputIndex, 0, readSize, System.nanoTime() / 1000, 0)
+                        val bytesToPut = minOf(readSize, inputBuffer.remaining())
+                        inputBuffer.put(pcmBuffer, 0, bytesToPut)
+                        codec?.queueInputBuffer(inputIndex, 0, bytesToPut, System.nanoTime() / 1000, 0)
                     }
                 }
 
