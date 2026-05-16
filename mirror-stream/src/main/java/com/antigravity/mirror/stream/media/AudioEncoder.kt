@@ -152,7 +152,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
             }
         } catch (e: Exception) {
             if (isRunning) {
-                Log.e(TAG, "Audio encoding loop error: ${e.message}")
+                Log.e(TAG, "Audio encoding loop error: ${e.javaClass.simpleName}: ${e.message}", e)
             }
         }
     }
