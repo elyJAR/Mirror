@@ -68,6 +68,11 @@ class MirrorClient(context: Context) {
         activeSession?.submitPin(pin)
     }
 
+    /** Send a control message to the active session. */
+    fun sendControl(message: ControlMessage) {
+        activeSession?.sendControl(message)
+    }
+
     private var discoveryJob: Job? = null
     private var sessionJob: Job? = null
     

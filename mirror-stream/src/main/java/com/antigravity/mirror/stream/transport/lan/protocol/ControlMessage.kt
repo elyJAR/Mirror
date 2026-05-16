@@ -145,3 +145,12 @@ data class ByeMessage(
     override val type: String = "bye",
     val reason: String
 ) : ControlMessage()
+
+/**
+ * Sent by the phone to toggle extended display on the PC.
+ */
+@Serializable
+@SerialName("extend_display")
+data class ExtendDisplayMessage(
+    override val type: String = "extend_display"
+) : ControlMessage()

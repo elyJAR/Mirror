@@ -80,6 +80,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var reverseControlCard: View
     private lateinit var reverseControlStatus: TextView
     private lateinit var reverseControlSwitch: com.google.android.material.switchmaterial.SwitchMaterial
+    private lateinit var extendDisplayCard: View
+    private lateinit var extendDisplayStatus: TextView
 
     // Connecting panel
     private lateinit var connectingLabel: TextView
@@ -215,6 +217,14 @@ class MainActivity : AppCompatActivity() {
         reverseControlCard = findViewById(R.id.reverseControlCard)
         reverseControlStatus = findViewById(R.id.reverseControlStatus)
         reverseControlSwitch = findViewById(R.id.reverseControlSwitch)
+        
+        // Extend Display
+        extendDisplayCard = findViewById(R.id.extendDisplayCard)
+        extendDisplayStatus = findViewById(R.id.extendDisplayStatus)
+
+        extendDisplayCard.setOnClickListener {
+            mirrorService?.sendControl(com.antigravity.mirror.stream.transport.lan.protocol.ExtendDisplayMessage())
+        }
         
         reverseControlCard.setOnClickListener {
             if (!com.antigravity.mirror.service.InputAccessibilityService.isEnabled()) {

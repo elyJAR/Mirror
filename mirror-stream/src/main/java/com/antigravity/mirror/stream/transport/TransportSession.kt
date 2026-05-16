@@ -48,6 +48,11 @@ interface TransportSession {
     fun submitPin(pin: String)
 
     /**
+     * Sends a custom control message to the peer.
+     */
+    fun sendControl(message: ControlMessage)
+
+    /**
      * Cleanly terminates the session.
      *
      * @param reason Informational reason to send to the peer (if the protocol supports it).

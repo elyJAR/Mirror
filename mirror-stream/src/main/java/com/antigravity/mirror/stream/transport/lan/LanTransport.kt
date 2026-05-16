@@ -104,6 +104,10 @@ private class LanTransportSession(
             .launchIn(sessionScope)
     }
 
+    override fun sendControl(message: ControlMessage) {
+        client.sendControl(message)
+    }
+
     override fun submitPin(pin: String) {
         client.submitPin(pin)
     }

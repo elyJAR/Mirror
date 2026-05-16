@@ -107,6 +107,20 @@ class ProtocolClient(
         }
     }
 
+    /** Send a control message (JSON) to the receiver. */
+    fun sendControl(msg: ControlMessage) {
+        val channel = controlWriteChannel ?: return
+        scope.launch {
+            runCatching {
+                writeMutex.withLock {
+                    channel.writeFrame(TAG_CONTROL, json.encodeToString(msg).toByteArray())
+                }
+            }.onFailure {
+                Log.e(TAG, "Failed to send control message: ${it.message}")
+            }
+        }
+    }
+
     fun isPairingRequired(): Boolean = awaitingPin
     
     private var lastPongTime = System.currentTimeMillis()

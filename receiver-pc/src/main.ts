@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard, screen } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { Bonjour } from 'bonjour-service';
@@ -58,12 +58,7 @@ const createWindow = () => {
     minWidth: 640,
     minHeight: 360,
     title: 'Mirror Receiver',
-    packagerConfig: {
-    asar: true,
-    extraResource: [
-      'src/assets'
-    ]
-  },  webPreferences: {
+    webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
   });
@@ -158,6 +153,35 @@ app.on('second-instance', () => {
 function startNetworkServices(window: BrowserWindow) {
   if (tcpServer) return;
 
+  const toggleProjection = async () => {
+    if (!mainWindow) return false;
+    
+    const displays = screen.getAllDisplays();
+    if (displays.length < 2) {
+      console.log('No extended display found');
+      return false;
+    }
+
+    const primaryDisplay = screen.getPrimaryDisplay();
+    const extendedDisplay = displays.find((d: Electron.Display) => d.id !== primaryDisplay.id) || displays[1];
+
+    if (mainWindow.getBounds().x !== primaryDisplay.bounds.x) {
+      // Move back to primary
+      mainWindow.setBounds(primaryDisplay.bounds);
+      mainWindow.setFullScreen(false);
+      mainWindow.webContents.send('projection-state', false);
+      return false;
+    } else {
+      // Move to extended
+      mainWindow.setBounds(extendedDisplay.bounds);
+      mainWindow.setFullScreen(true);
+      mainWindow.webContents.send('projection-state', true);
+      return true;
+    }
+  };
+
+  ipcMain.handle('project-to-extended', toggleProjection);
+
   tcpServer = net.createServer((socket) => {
     const remoteAddress = socket.remoteAddress;
     console.log('Phone connected:', remoteAddress);
@@ -201,7 +225,7 @@ function startNetworkServices(window: BrowserWindow) {
         const payload = buffer.subarray(5, 5 + length);
         buffer = buffer.slice(5 + length);
         
-        const shouldContinue = handleFrame(tag, payload, socket, window, () => {
+        const shouldContinue = handleFrame(tag, payload, socket, window, toggleProjection, () => {
           pinAttempts++;
           return pinAttempts >= MAX_PIN_ATTEMPTS;
         });
@@ -257,7 +281,7 @@ function startNetworkServices(window: BrowserWindow) {
   }
 }
 
-function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: BrowserWindow, onPinFailure: () => boolean): boolean {
+function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: BrowserWindow, onToggleProjection: () => void, onPinFailure: () => boolean): boolean {
   if (tag === 0x01) { // Control Message (JSON)
     try {
       const raw = payload.toString();
@@ -303,6 +327,9 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
             return false; // Signal to disconnect
           }
         }
+      } else if (inferredType === 'extend_display') {
+        // Trigger projection logic (from phone)
+        onToggleProjection(); 
       } else if (inferredType === 'ping') {
         sendControl(socket, {
           type: 'pong',

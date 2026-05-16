@@ -143,6 +143,7 @@ class MirrorService : Service() {
     }
     fun disconnect() = client.disconnect()
     fun submitPin(pin: String) = client.submitPin(pin)
+    fun sendControl(message: com.antigravity.mirror.stream.transport.lan.protocol.ControlMessage) = client.sendControl(message)
     fun getState(): StateFlow<MirrorState> = client.state
     fun getStats(): StateFlow<com.antigravity.mirror.stream.api.SessionStats> = client.stats
     fun getStreamStartMs(): Long = client.getStreamStartMs()

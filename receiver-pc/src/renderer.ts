@@ -6,14 +6,16 @@
  * Requirements: tasks.md §4.3
  */
 
-const statusEl = document.getElementById('status')!;
-const peerEl = document.getElementById('peer')!;
-const statsEl = document.getElementById('stats')!;
-const hudEl = document.getElementById('hud')!;
-const pairingEl = document.getElementById('pairing')!;
-const pinEl = document.getElementById('pin')!;
+const statusEl = document.getElementById('status') as HTMLElement;
+const peerEl = document.getElementById('peer') as HTMLElement;
+const statsEl = document.getElementById('stats') as HTMLElement;
+const hudEl = document.getElementById('hud') as HTMLElement;
+const pairingEl = document.getElementById('pairing') as HTMLElement;
+const pinEl = document.getElementById('pin') as HTMLElement;
 const canvas = document.getElementById('videoCanvas') as HTMLCanvasElement;
-const ctx = canvas.getContext('2d')!;
+const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
+const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
+const audioStatusEl = document.getElementById('audio-status') as HTMLElement;
 
 let hudVisible = false;
 
@@ -27,7 +29,19 @@ window.addEventListener('keydown', (e) => {
 });
 
 let decoder: VideoDecoder | null = null;
-let audioDecoder: AudioDecoder | null = null;
+interface AudioData {
+  numberOfChannels: number;
+  numberOfFrames: number;
+  sampleRate: number;
+  copyTo: (dest: Float32Array, options: { planeIndex: number }) => void;
+  close: () => void;
+}
+let audioDecoder: { 
+  decode: (chunk: { type: string; timestamp: number; data: Uint8Array }) => void; 
+  close: () => void; 
+  state: string; 
+  configure: (config: { codec: string; sampleRate: number; numberOfChannels: number; description?: Uint8Array }) => void 
+} | null = null;
 let audioCtx: AudioContext | null = null;
 let nextAudioTime = 0;
 let inputEnabled = false;
@@ -52,7 +66,7 @@ function initDecoder() {
       frame.close();
       frameCount++;
     },
-    error: (e) => {
+    error: (e: Error) => {
       console.error('VideoDecoder error:', e);
       statusEl.textContent = `Decoder Error: ${e.message}`;
     },
@@ -74,7 +88,7 @@ function initAudio() {
   }
 
   audioDecoder = new window.AudioDecoder({
-    output: (data) => {
+    output: (data: AudioData) => {
       if (!audioCtx) return;
 
       const buffer = audioCtx.createBuffer(
@@ -95,9 +109,14 @@ function initAudio() {
       source.start(startTime);
       nextAudioTime = startTime + buffer.duration;
 
+      if (audioStatusEl) {
+        audioStatusEl.textContent = 'Audio: Live';
+        audioStatusEl.style.color = '#4ade80';
+      }
+
       data.close();
     },
-    error: (e) => console.error('AudioDecoder error:', e),
+    error: (e: Error) => console.error('AudioDecoder error:', e),
   });
 
   // AudioSpecificConfig for AAC-LC, 44100 Hz, stereo:
@@ -130,7 +149,7 @@ window.electronAPI.onAudioFrame((payload: Uint8Array) => {
 
   try {
     audioDecoder.decode(chunk);
-  } catch (e) {
+  } catch (e: unknown) {
     console.error('Audio decode failed:', e);
   }
 });
@@ -150,6 +169,7 @@ window.electronAPI.onPeerConnected((peer) => {
   statusEl.textContent = 'Connected, waiting for stream...';
   initDecoder(); // Re-init on new connection
   inputEnabled = false;
+  if (btnProject) btnProject.style.display = 'block';
 });
 
 window.electronAPI.onPeerDisconnected(() => {
@@ -158,6 +178,7 @@ window.electronAPI.onPeerDisconnected(() => {
   isConfigured = false;
   pairingEl.style.display = 'none';
   inputEnabled = false;
+  if (btnProject) btnProject.style.display = 'none';
 });
 
 window.electronAPI.onControlMessage((msg) => {
@@ -321,4 +342,19 @@ window.electronAPI.onPairingSuccess(() => {
   // Pairing success fires right after user interaction (PIN submit) — safe to
   // initialise AudioContext here to satisfy the browser autoplay policy.
   initAudio();
+});
+
+// --- Projection UI ---
+
+if (btnProject) {
+  btnProject.addEventListener('click', () => {
+    window.electronAPI.projectToExtended();
+  });
+}
+
+window.electronAPI.onProjectionState((isProjected) => {
+  if (btnProject) {
+    btnProject.textContent = isProjected ? 'Back to Primary' : 'Project to Extended';
+    btnProject.style.background = isProjected ? 'rgba(255,68,68,0.7)' : 'rgba(0,122,255,0.7)';
+  }
 });

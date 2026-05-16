@@ -1,5 +1,5 @@
 export interface IElectronAPI {
-  onControlMessage: (callback: (msg: any) => void) => void;
+  onControlMessage: (callback: (msg: Record<string, unknown>) => void) => void;
   onVideoFrame: (callback: (frame: Uint8Array) => void) => void;
   onAudioFrame: (callback: (frame: Uint8Array) => void) => void;
   onPeerConnected: (callback: (peer: { address: string }) => void) => void;
@@ -8,16 +8,29 @@ export interface IElectronAPI {
   onLocalIp: (callback: (ip: string) => void) => void;
   onPairingSuccess: (callback: () => void) => void;
   onProjectionState: (callback: (isProjecting: boolean) => void) => void;
-  onSyncState: (callback: (state: any) => void) => void;
-  sendControl: (msg: any) => Promise<void>;
+  onSyncState: (callback: (state: unknown) => void) => void;
+  sendControl: (msg: Record<string, unknown>) => Promise<void>;
   projectToExtended: () => Promise<boolean>;
-  getPairingState: () => Promise<any>;
+  getPairingState: () => Promise<unknown>;
 }
 
 declare global {
   interface Window {
     electronAPI: IElectronAPI;
-    AudioDecoder: any;
-    EncodedAudioChunk: any;
+    AudioDecoder: {
+      new (init: {
+        output: (data: unknown) => void;
+        error: (e: Error) => void;
+      }): unknown;
+      isConfigSupported(config: unknown): Promise<unknown>;
+    };
+    EncodedAudioChunk: {
+      new (init: {
+        type: 'key' | 'delta';
+        timestamp: number;
+        data: Uint8Array;
+      }): unknown;
+    };
+    AudioContext: typeof AudioContext;
   }
 }
