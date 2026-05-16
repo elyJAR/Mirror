@@ -27,8 +27,9 @@
     <!-- Signal / icon tint -->
     <color name="kg_icon_tint">#FF6B80A0</color>
 
-    <!-- Divider -->
+    <!-- Divider / Border -->
     <color name="kg_divider">#1AFFFFFF</color>
+    <color name="kg_border">#FF2A3348</color>
 
     <!-- Legacy keep-alive (required by Material theme attrs) -->
     <color name="white">#FFFFFFFF</color>
