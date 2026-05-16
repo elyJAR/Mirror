@@ -37,6 +37,7 @@ if (!gotSingleInstanceLock) {
 }
 
 let mainWindow: BrowserWindow | null = null;
+let projectionWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -232,7 +233,7 @@ function startNetworkServices(window: BrowserWindow) {
 
     socket.on('close', () => {
       console.log('Phone disconnected');
-      window.webContents.send('peer-disconnected');
+      broadcastToWindows('peer-disconnected');
       ipcMain.removeHandler('send-control'); // Cleanup handler
     });
 
@@ -250,7 +251,7 @@ function startNetworkServices(window: BrowserWindow) {
     }
 
     if (mainWindow) {
-      window.webContents.send('peer-disconnected');
+      broadcastToWindows('peer-disconnected');
     }
   });
 
@@ -284,7 +285,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
       
-      window.webContents.send('control-message', msg);
+      broadcastToWindows('control-message', msg);
       
       // Automatic handshake response
       if (inferredType === 'hello') {
@@ -301,7 +302,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         });
         
         if (isTrusted) {
-          window.webContents.send('pairing-success');
+          broadcastToWindows('pairing-success');
         }
       } else if (inferredType === 'verify-pin') {
         const isMatch = msg.pin === currentPin;
@@ -313,7 +314,7 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         
         if (isMatch) {
           trustedDevices.add(socket.remoteAddress || 'unknown');
-          window.webContents.send('pairing-success');
+          broadcastToWindows('pairing-success');
         } else {
           if (onPinFailure()) {
             return false; // Signal to disconnect
@@ -329,9 +330,9 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
       console.error('Failed to parse control message:', e);
     }
   } else if (tag === 0x02) { // Video NAL Unit
-    window.webContents.send('video-frame', payload);
+    broadcastToWindows('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
-    window.webContents.send('audio-frame', payload);
+    broadcastToWindows('audio-frame', payload);
   }
   return true;
 }
@@ -377,29 +378,53 @@ function cleanup() {
   ipcMain.removeHandler('send-control');
 }
 
-function moveToNextDisplay() {
-  if (!mainWindow) return;
-
-  const displays = screen.getAllDisplays();
-  if (displays.length <= 1) {
-    console.log('No extended screen detected.');
-    return;
+ipcMain.handle('project-to-extended', () => {
+  if (projectionWindow) {
+    projectionWindow.close();
+    projectionWindow = null;
+    return false;
   }
 
-  const currentBounds = mainWindow.getBounds();
-  const currentDisplay = screen.getDisplayMatching(currentBounds);
-  const nextDisplayIndex = (displays.findIndex(d => d.id === currentDisplay.id) + 1) % displays.length;
-  const nextDisplay = displays[nextDisplayIndex];
+  const displays = screen.getAllDisplays();
+  const externalDisplay = displays.find((display) => {
+    return display.bounds.x !== 0 || display.bounds.y !== 0;
+  });
 
-  console.log(`Moving window to display ${nextDisplayIndex} at ${nextDisplay.bounds.x},${nextDisplay.bounds.y}`);
-  mainWindow.setBounds(nextDisplay.bounds);
-  mainWindow.maximize();
-  mainWindow.setFullScreen(true);
-}
+  if (externalDisplay) {
+    projectionWindow = new BrowserWindow({
+      x: externalDisplay.bounds.x,
+      y: externalDisplay.bounds.y,
+      fullscreen: true,
+      autoHideMenuBar: true,
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+      },
+    });
 
-ipcMain.on('move-to-extended-screen', () => {
-  moveToNextDisplay();
+    if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+      projectionWindow.loadURL(`${MAIN_WINDOW_VITE_DEV_SERVER_URL}?projection=true`);
+    } else {
+      projectionWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`), { query: { projection: 'true' } });
+    }
+
+    projectionWindow.on('closed', () => {
+      projectionWindow = null;
+      mainWindow?.webContents.send('projection-state', false);
+    });
+
+    return true;
+  }
+  return false;
 });
+
+function broadcastToWindows(channel: string, ...args: any[]) {
+  if (mainWindow) {
+    mainWindow.webContents.send(channel, ...args);
+  }
+  if (projectionWindow) {
+    projectionWindow.webContents.send(channel, ...args);
+  }
+}
 
 app.on('ready', createWindow);
 

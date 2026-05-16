@@ -15,9 +15,28 @@ const pinEl = document.getElementById('pin')!;
 const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
 const canvas = document.getElementById('videoCanvas') as HTMLCanvasElement;
 
-btnProject.onclick = () => {
-  window.electronAPI.projectToExtended();
+const isProjection = new URLSearchParams(window.location.search).get('projection') === 'true';
+
+if (isProjection) {
+  btnProject.style.display = 'none';
+  statusEl.style.display = 'none';
+  hudEl.style.display = 'none';
+}
+
+btnProject.onclick = async () => {
+  const isNowProjecting = await window.electronAPI.projectToExtended();
+  updateProjectionUI(isNowProjecting);
 };
+
+function updateProjectionUI(isProjecting: boolean) {
+  btnProject.textContent = isProjecting ? 'Stop Projection' : 'Project to Extended';
+  btnProject.style.backgroundColor = isProjecting ? '#ff4444' : '';
+}
+
+window.electronAPI.onProjectionState((isProjecting) => {
+  updateProjectionUI(isProjecting);
+});
+
 const ctx = canvas.getContext('2d')!;
 
 let hudVisible = false;
@@ -160,7 +179,9 @@ window.electronAPI.onPeerConnected((peer) => {
   statusEl.textContent = 'Connected, waiting for stream...';
   initDecoder(); // Re-init on new connection
   inputEnabled = false;
-  btnProject.style.display = 'block';
+  if (!isProjection) {
+    btnProject.style.display = 'block';
+  }
 });
 
 window.electronAPI.onPeerDisconnected(() => {

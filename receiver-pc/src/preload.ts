@@ -28,10 +28,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onPairingSuccess: (callback: () => void) =>
     ipcRenderer.on('pairing-success', (_event) => callback()),
     
-  onPeerDisconnected: (callback: () => void) =>
-    ipcRenderer.on('peer-disconnected', (_event) => callback()),
+  onProjectionState: (callback: (isProjecting: boolean) => void) =>
+    ipcRenderer.on('projection-state', (_event, value) => callback(value)),
 
   // Actions to send to Main process
   sendControl: (msg: any) => ipcRenderer.invoke('send-control', msg),
-  projectToExtended: () => ipcRenderer.send('move-to-extended-screen'),
+  projectToExtended: () => ipcRenderer.invoke('project-to-extended'),
 });
