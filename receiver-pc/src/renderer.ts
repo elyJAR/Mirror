@@ -7,6 +7,16 @@
  */
 
 const statusEl = document.getElementById('status')!;
+const debugLogsEl = document.getElementById('debug-logs')!;
+
+function logToScreen(msg: string) {
+  if (debugLogsEl) {
+    const div = document.createElement('div');
+    div.textContent = `> ${msg}`;
+    debugLogsEl.prepend(div);
+  }
+  console.log('[UI LOG]', msg);
+}
 const peerEl = document.getElementById('peer')!;
 const statsEl = document.getElementById('stats')!;
 const hudEl = document.getElementById('hud')!;
@@ -171,9 +181,10 @@ statusEl.style.display = 'block';
 hudEl.style.display = 'block';
 
 // Fetch initial state
+logToScreen('Fetching initial state...');
 window.electronAPI.getPairingState().then((state: any) => {
+  logToScreen(`Initial state: peer=${state.currentPeer}, paired=${state.isPaired}, pin=${state.currentPin}`);
   if (state.currentPin) {
-    console.log('Fetched initial PIN:', state.currentPin);
     pinEl.textContent = state.currentPin;
     pairingEl.style.display = 'block';
   }
@@ -189,10 +200,12 @@ window.electronAPI.getPairingState().then((state: any) => {
 // --- IPC Event Handlers ---
 
 window.electronAPI.onLocalIp((ip) => {
+  logToScreen(`Local IP received: ${ip}`);
   statusEl.textContent = `Waiting for phone at ${ip}...`;
 });
 
 window.electronAPI.onPeerConnected((peer) => {
+  logToScreen(`Peer connected: ${peer.address}`);
   peerEl.textContent = peer.address;
   statusEl.textContent = 'Connected, waiting for stream...';
   initDecoder(); // Re-init on new connection
@@ -203,6 +216,7 @@ window.electronAPI.onPeerConnected((peer) => {
 });
 
 window.electronAPI.onPeerDisconnected(() => {
+  logToScreen('Peer disconnected');
   peerEl.textContent = 'No Peer';
   statusEl.textContent = 'Waiting for phone...';
   isConfigured = false;
@@ -361,12 +375,13 @@ window.addEventListener('keydown', (e) => {
 // --- Pairing IPC Handlers ---
 
 window.electronAPI.onPairingPin((pin) => {
-  console.log('Received pairing PIN:', pin);
+  logToScreen(`Pairing PIN received: ${pin}`);
   pinEl.textContent = pin;
   pairingEl.style.display = 'block';
 });
 
 window.electronAPI.onPairingSuccess(() => {
+  logToScreen('Pairing SUCCESS');
   pairingEl.style.display = 'none';
   statusEl.textContent = 'Authenticated. Starting stream...';
   inputEnabled = true;
