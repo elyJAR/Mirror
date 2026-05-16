@@ -405,6 +405,9 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
     }
     broadcastToWindows('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)
+    if (debugFrameCount % 100 === 0) {
+      console.log(`Audio frame received: ${payload.length} bytes`);
+    }
     broadcastToWindows('audio-frame', payload);
   }
   return true;
