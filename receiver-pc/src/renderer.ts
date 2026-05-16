@@ -50,6 +50,17 @@ let isConfigured = false;
 let frameCount = 0;
 let bytesReceived = 0;
 let lastStatsTime = Date.now();
+let baseAndroidTs: number | null = null;
+let baseAudioContextTime = 0;
+const SYNC_DELAY_US = 150000; // 150ms buffer for sync
+
+function getPlaybackTime(ts: number): number {
+  if (baseAndroidTs === null || !audioCtx) {
+    baseAndroidTs = ts;
+    baseAudioContextTime = (audioCtx?.currentTime || 0) + SYNC_DELAY_US / 1000000;
+  }
+  return baseAudioContextTime + (ts - baseAndroidTs) / 1000000;
+}
 
 function initDecoder() {
   if (decoder) {
@@ -58,13 +69,19 @@ function initDecoder() {
 
   decoder = new VideoDecoder({
     output: (frame) => {
-      if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
-        canvas.width = frame.displayWidth;
-        canvas.height = frame.displayHeight;
-      }
-      ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-      frame.close();
-      frameCount++;
+      const targetTime = getPlaybackTime(frame.timestamp || 0);
+      const now = audioCtx?.currentTime || 0;
+      const delayMs = Math.max(0, (targetTime - now) * 1000);
+
+      setTimeout(() => {
+        if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
+          canvas.width = frame.displayWidth;
+          canvas.height = frame.displayHeight;
+        }
+        ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+        frame.close();
+        frameCount++;
+      }, delayMs);
     },
     error: (e: Error) => {
       console.error('VideoDecoder error:', e);
@@ -76,10 +93,8 @@ function initDecoder() {
 }
 
 function initAudio() {
-  // AudioContext can only be created once (rate-limited by browsers / Electron).
   if (!audioCtx) {
     audioCtx = new window.AudioContext({ latencyHint: 'interactive' });
-    nextAudioTime = audioCtx.currentTime;
   }
 
   // Re-create AudioDecoder on every call so reconnects get a fresh decoder.
@@ -105,9 +120,9 @@ function initAudio() {
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
-      const startTime = Math.max(nextAudioTime, audioCtx.currentTime);
+      const targetTime = getPlaybackTime(data.timestamp || 0);
+      const startTime = Math.max(targetTime, audioCtx.currentTime);
       source.start(startTime);
-      nextAudioTime = startTime + buffer.duration;
 
       if (audioStatusEl) {
         audioStatusEl.textContent = 'Audio: Live';
@@ -137,13 +152,12 @@ window.addEventListener('click', () => {
   initAudio();
 });
 
-// ...
-window.electronAPI.onAudioFrame((payload: Uint8Array) => {
+window.electronAPI.onAudioFrame((payload: Uint8Array, timestamp: number) => {
   if (!audioDecoder || audioDecoder.state === 'closed') return;
 
   const chunk = new window.EncodedAudioChunk({
     type: 'key',
-    timestamp: performance.now() * 1000,
+    timestamp: timestamp,
     data: payload,
   });
 
@@ -167,6 +181,7 @@ window.electronAPI.onLocalIp((ip) => {
 window.electronAPI.onPeerConnected((peer) => {
   peerEl.textContent = peer.address;
   statusEl.textContent = 'Connected, waiting for stream...';
+  baseAndroidTs = null; // Reset sync
   initDecoder(); // Re-init on new connection
   inputEnabled = false;
   if (btnProject) btnProject.style.display = 'block';
@@ -178,6 +193,7 @@ window.electronAPI.onPeerDisconnected(() => {
   isConfigured = false;
   pairingEl.style.display = 'none';
   inputEnabled = false;
+  baseAndroidTs = null; // Reset sync
   if (btnProject) btnProject.style.display = 'none';
 });
 
@@ -188,7 +204,7 @@ window.electronAPI.onControlMessage((msg) => {
   }
 });
 
-window.electronAPI.onVideoFrame((payload: Uint8Array) => {
+window.electronAPI.onVideoFrame((payload: Uint8Array, timestamp: number) => {
   if (!decoder || decoder.state === 'closed') return;
 
   bytesReceived += payload.length;
@@ -242,7 +258,7 @@ window.electronAPI.onVideoFrame((payload: Uint8Array) => {
 
   const chunk = new window.EncodedVideoChunk({
     type: isKey ? 'key' : 'delta',
-    timestamp: performance.now() * 1000,
+    timestamp: timestamp,
     data: annexB,
   });
 

@@ -1,5 +1,6 @@
 package com.antigravity.mirror.stream.transport
 
+import com.antigravity.mirror.stream.media.AudioFrame
 import com.antigravity.mirror.stream.media.NalUnit
 import com.antigravity.mirror.stream.transport.lan.protocol.ControlMessage
 import kotlinx.coroutines.channels.SendChannel
@@ -21,7 +22,7 @@ interface TransportSession {
     /**
      * Sink for encoded AAC audio data.
      */
-    val audioSink: SendChannel<ByteArray>
+    val audioSink: SendChannel<AudioFrame>
 
     /**
      * The video codec negotiated with the peer (e.g. "video/avc", "video/hevc").

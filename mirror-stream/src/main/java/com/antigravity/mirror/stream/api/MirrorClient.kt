@@ -307,13 +307,12 @@ class MirrorClient(context: Context) {
             
                 // Start audio capture (Android 10+)
                 Log.d(TAG, "Creating AudioEncoder")
-                audioEncoder = AudioEncoder(projection).apply {
-                    Log.d(TAG, "Starting AudioEncoder with latencyMode=${config.latencyMode}")
-                    start { data, _ ->
-                        session.audioSink.trySend(data)
-                    }
-                    Log.d(TAG, "AudioEncoder started")
+                val audioEnc = AudioEncoder(projection)
+                audioEncoder = audioEnc
+                audioEnc.start { data, ts ->
+                    session.audioSink.trySend(com.antigravity.mirror.stream.media.AudioFrame(data, ts))
                 }
+                Log.d(TAG, "AudioEncoder started")
             
                 // Default to 160 DPI
                 Log.d(TAG, "Starting screen capture with DPI=160")

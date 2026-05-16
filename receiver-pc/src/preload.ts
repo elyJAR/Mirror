@@ -10,11 +10,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onControlMessage: (callback: (msg: unknown) => void) => 
     ipcRenderer.on('control-message', (_, value) => callback(value)),
     
-  onVideoFrame: (callback: (frame: Uint8Array) => void) => 
-    ipcRenderer.on('video-frame', (_, value) => callback(value)),
+  onVideoFrame: (callback: (frame: Uint8Array, timestamp: number) => void) => 
+    ipcRenderer.on('video-frame', (_, value, ts) => callback(value, ts)),
 
-  onAudioFrame: (callback: (frame: Uint8Array) => void) =>
-    ipcRenderer.on('audio-frame', (_, value) => callback(value)),
+  onAudioFrame: (callback: (frame: Uint8Array, timestamp: number) => void) =>
+    ipcRenderer.on('audio-frame', (_, value, ts) => callback(value, ts)),
     
   onPeerConnected: (callback: (peer: { address: string }) => void) =>
     ipcRenderer.on('peer-connected', (_, value) => callback(value)),

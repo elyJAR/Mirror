@@ -4,6 +4,7 @@ import android.os.Build
 import android.util.Log
 import com.antigravity.mirror.stream.api.MirrorError
 import com.antigravity.mirror.stream.api.SessionStats
+import com.antigravity.mirror.stream.media.AudioFrame
 import com.antigravity.mirror.stream.media.NalUnit
 import com.antigravity.mirror.stream.transport.TransportEvent
 import io.ktor.network.selector.*
@@ -20,6 +21,7 @@ import kotlinx.serialization.encodeToString
 
 import java.util.LinkedList
 import java.util.Collections
+import java.nio.ByteBuffer
 
 private const val TAG = "MirrorApp/ProtocolClient"
 private const val MAX_QUEUE_SIZE = 30
@@ -44,7 +46,7 @@ class ProtocolClient(
     private val selector = SelectorManager(Dispatchers.IO)
     
     private val videoQueue = LinkedList<NalUnit>()
-    private val audioQueue = LinkedList<ByteArray>()
+    private val audioQueue = LinkedList<AudioFrame>()
     private val queueSignal = Channel<Unit>(capacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     private val writeMutex = kotlinx.coroutines.sync.Mutex()
     
@@ -253,32 +255,45 @@ class ProtocolClient(
                 // Wait for a signal that data is available
                 queueSignal.receive()
                 
-                var nal: NalUnit?
+                // Drain video queue
                 while (true) {
+                    val nal: NalUnit?
                     synchronized(videoQueue) {
                         nal = videoQueue.pollFirst()
                     }
                     if (nal == null) break
                     
                     writeMutex.withLock {
-                        writeChannel.writeFrame(TAG_VIDEO, nal!!.payload)
+                        // Protocol: [Timestamp: 8 bytes] [NAL Data: N bytes]
+                        val timestamp = nal!!.presentationTimeUs
+                        val payload = ByteBuffer.allocate(8 + nal!!.payload.size)
+                            .putLong(timestamp)
+                            .put(nal!!.payload)
+                            .array()
+                        writeChannel.writeFrame(TAG_VIDEO, payload)
                     }
                     framesSent++
-                    bytesSent += nal!!.payload.size
+                    bytesSent += (8 + nal!!.payload.size)
                 }
 
                 // Drain audio queue
                 while (true) {
-                    val audio: ByteArray?
+                    val audioFrame: AudioFrame?
                     synchronized(audioQueue) {
-                        audio = audioQueue.pollFirst()
+                        audioFrame = audioQueue.pollFirst()
                     }
-                    if (audio == null) break
+                    if (audioFrame == null) break
                     
                     writeMutex.withLock {
-                        writeChannel.writeFrame(TAG_AUDIO, audio)
+                        // Protocol: [Timestamp: 8 bytes] [AAC Data: N bytes]
+                        val timestamp = audioFrame.presentationTimeUs
+                        val payload = ByteBuffer.allocate(8 + audioFrame.data.size)
+                            .putLong(timestamp)
+                            .put(audioFrame.data)
+                            .array()
+                        writeChannel.writeFrame(TAG_AUDIO, payload)
                     }
-                    bytesSent += audio.size
+                    bytesSent += (8 + audioFrame.data.size)
                 }
             }
         } catch (e: Exception) {
@@ -378,12 +393,12 @@ class ProtocolClient(
     /**
      * Enqueues audio data for transmission.
      */
-    fun sendAudio(data: ByteArray) {
+    fun sendAudio(frame: AudioFrame) {
         synchronized(audioQueue) {
             if (audioQueue.size >= 100) { // Limit audio queue to ~2s of data
                 audioQueue.pollFirst()
             }
-            audioQueue.addLast(data)
+            audioQueue.addLast(frame)
             queueSignal.trySend(Unit)
         }
     }

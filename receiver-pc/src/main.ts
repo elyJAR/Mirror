@@ -409,12 +409,20 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
     } catch (e) {
       console.error('Failed to parse control message:', e);
     }
-  } else if (tag === 0x02) { // Video NAL Unit
-    if (mainWindow) mainWindow.webContents.send('video-frame', payload);
-    if (projectionWindow) projectionWindow.webContents.send('video-frame', payload);
-  } else if (tag === 0x03) { // Audio Data (AAC)
-    if (mainWindow) mainWindow.webContents.send('audio-frame', payload);
-    if (projectionWindow) projectionWindow.webContents.send('audio-frame', payload);
+  } else if (tag === 0x02) { // Video NAL Unit (with 8-byte timestamp)
+    if (payload.length >= 8) {
+      const ts = payload.readBigInt64BE(0);
+      const data = payload.subarray(8);
+      if (mainWindow) mainWindow.webContents.send('video-frame', data, Number(ts));
+      if (projectionWindow) projectionWindow.webContents.send('video-frame', data, Number(ts));
+    }
+  } else if (tag === 0x03) { // Audio Data (with 8-byte timestamp)
+    if (payload.length >= 8) {
+      const ts = payload.readBigInt64BE(0);
+      const data = payload.subarray(8);
+      if (mainWindow) mainWindow.webContents.send('audio-frame', data, Number(ts));
+      if (projectionWindow) projectionWindow.webContents.send('audio-frame', data, Number(ts));
+    }
   }
   return true;
 }
