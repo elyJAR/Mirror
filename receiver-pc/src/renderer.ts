@@ -274,6 +274,18 @@ window.electronAPI.onControlMessage((msg) => {
   }
 });
 
+// Click anywhere to enable audio (browser requirement)
+document.addEventListener('click', () => {
+  if (audioContext?.state === 'suspended') {
+    audioContext.resume();
+  }
+  if (!audioInitialized) {
+    initAudio().then(() => {
+      logToScreen('Audio initialized via user click');
+    });
+  }
+}, { once: false });
+
 window.electronAPI.onVideoFrame((payload: Uint8Array) => {
   if (frameCount < 5) {
     logToScreen(`Video IPC received: ${payload.length} bytes (#${frameCount})`);

@@ -298,6 +298,13 @@ function startNetworkServices(window: BrowserWindow) {
     console.log('TCP Server listening on port 8765 (all interfaces)');
   });
 
+  // Keep-alive heartbeat to prevent phone from resetting to Scanning state
+  setInterval(() => {
+    if (activeSocket && !activeSocket.destroyed && isPaired) {
+      sendControl(activeSocket, { type: 'heartbeat', status: 'streaming' });
+    }
+  }, 5000);
+
   // Advertise service via mDNS
   try {
     bonjour.publish({ 
@@ -395,6 +402,11 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
     if (debugFrameCount < 5) {
       console.log(`Video frame #${debugFrameCount} received: ${payload.length} bytes`);
       debugFrameCount++;
+    }
+    if (!isPaired) {
+      isPaired = true;
+      currentPin = '';
+      broadcastSyncState();
     }
     broadcastToWindows('video-frame', payload);
   } else if (tag === 0x03) { // Audio Data (AAC)

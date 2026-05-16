@@ -118,9 +118,11 @@ class MainActivity : AppCompatActivity() {
             isBound = true
             observeState()
             
-            // Auto-discover if permissions are already granted
-            if (PermissionManager.missingPermissions(this@MainActivity).isEmpty()) {
-                mirrorService?.startDiscovery()
+            // Only auto-discover if we're not already streaming/connecting
+            if (mirrorService?.getState()?.value is MirrorState.Idle) {
+                if (PermissionManager.missingPermissions(this@MainActivity).isEmpty()) {
+                    mirrorService?.startDiscovery()
+                }
             }
         }
 
