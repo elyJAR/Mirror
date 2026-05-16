@@ -156,6 +156,8 @@ app.on('second-instance', () => {
 function startNetworkServices(window: BrowserWindow) {
   if (tcpServer) return;
 
+  let activeSocket: net.Socket | null = null;
+
   const toggleProjection = async () => {
     if (projectionWindow) {
       projectionWindow.close();
