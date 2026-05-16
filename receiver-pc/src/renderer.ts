@@ -123,14 +123,18 @@ function initAudio() {
         data.copyTo(buffer.getChannelData(i), { planeIndex: i });
       }
 
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
       const source = audioCtx.createBufferSource();
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
+      // Simple direct playback - if nextAudioTime is in the past, catch up to now
       const now = audioCtx.currentTime;
-      // Prevent unbounded latency: bound the playhead to within 100ms of real-time
-      if (nextAudioTime < now || nextAudioTime > now + 0.1) {
-        nextAudioTime = now + 0.05; // Force 50ms buffer
+      if (nextAudioTime < now) {
+        nextAudioTime = now;
       }
 
       source.start(nextAudioTime);
