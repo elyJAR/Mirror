@@ -74,7 +74,13 @@ class MirrorClient(context: Context) {
 
     /** Send a control message to the active session. */
     fun sendControl(message: ControlMessage) {
-        activeSession?.sendControl(message)
+        val session = activeSession
+        if (session == null) {
+            Log.w(TAG, "sendControl called but activeSession is null!")
+        } else {
+            Log.d(TAG, "Forwarding control message to active session: ${message::class.simpleName}")
+            session.sendControl(message)
+        }
     }
 
     private var discoveryJob: Job? = null

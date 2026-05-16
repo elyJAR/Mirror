@@ -109,11 +109,17 @@ class ProtocolClient(
 
     /** Send a control message (JSON) to the receiver. */
     fun sendControl(msg: ControlMessage) {
-        val channel = controlWriteChannel ?: return
+        val channel = controlWriteChannel
+        if (channel == null) {
+            Log.w(TAG, "sendControl: controlWriteChannel is null!")
+            return
+        }
         scope.launch {
             runCatching {
                 writeMutex.withLock {
-                    channel.writeFrame(TAG_CONTROL, json.encodeToString(msg).toByteArray())
+                    val payload = json.encodeToString(msg)
+                    Log.d(TAG, "Writing control frame: $payload")
+                    channel.writeFrame(TAG_CONTROL, payload.toByteArray())
                 }
             }.onFailure {
                 Log.e(TAG, "Failed to send control message: ${it.message}")
