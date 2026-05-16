@@ -24,7 +24,7 @@ const pairingEl = document.getElementById('pairing')!;
 const pinEl = document.getElementById('pin')!;
 const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
 const btnRefresh = document.getElementById('btnRefresh') as HTMLButtonElement;
-const canvas = document.getElementById('videoCanvas') as HTMLCanvasElement;
+const audioStatusEl = document.getElementById('audio-status')!;
 
 const isProjection = new URLSearchParams(window.location.search).get('projection') === 'true';
 
@@ -161,6 +161,8 @@ function initAudio() {
   });
 
   console.log('AudioDecoder configured (AAC-LC 44100Hz stereo)');
+  audioStatusEl.textContent = 'Audio: Live';
+  audioStatusEl.style.color = '#00ff00';
 }
 
 // Initialise audio on any user interaction (fallback / reconnect path)
@@ -178,6 +180,10 @@ window.electronAPI.onAudioFrame((payload: Uint8Array) => {
     // If we have frames but no decoder, try a late-init (might still need user gesture)
     if (audioDebugCount % 100 === 0) {
         console.warn('Audio frame received but decoder not ready. User click might be required.');
+        audioStatusEl.textContent = 'Audio: Click to Enable';
+        audioStatusEl.style.color = '#ffaa00';
+        audioStatusEl.style.cursor = 'pointer';
+        audioStatusEl.onclick = () => initAudio();
     }
     return;
   }
