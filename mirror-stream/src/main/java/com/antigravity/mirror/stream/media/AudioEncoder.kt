@@ -113,10 +113,14 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
         val bufferInfo = MediaCodec.BufferInfo()
         val pcmBuffer = ByteArray(pcmBufferSize)
 
+        var readCount = 0
         try {
             while (isRunning) {
                 // Read PCM from AudioRecord
                 val readSize = audioRecord?.read(pcmBuffer, 0, pcmBuffer.size) ?: -1
+                if (readCount++ % 100 == 0) {
+                    Log.d(TAG, "AudioRecord read: $readSize bytes")
+                }
                 if (readSize <= 0) {
                     if (!isRunning) break
                     Thread.yield()
