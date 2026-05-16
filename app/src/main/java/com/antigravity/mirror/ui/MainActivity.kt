@@ -224,10 +224,18 @@ class MainActivity : AppCompatActivity() {
         extendDisplayStatus = findViewById(R.id.extendDisplayStatus)
 
         extendDisplayCard.setOnClickListener {
+            Log.d(TAG, "extendDisplayCard clicked. mirrorService state: ${mirrorService != null}")
             if (mirrorService != null) {
-                mirrorService?.sendControl(com.antigravity.mirror.stream.transport.lan.protocol.ExtendDisplayMessage())
-                Toast.makeText(this, "Requesting PC projection...", Toast.LENGTH_SHORT).show()
-                extendDisplayStatus.text = "Request sent to PC"
+                try {
+                    val msg = com.antigravity.mirror.stream.transport.lan.protocol.ExtendDisplayMessage()
+                    Log.d(TAG, "Sending ExtendDisplayMessage to service")
+                    mirrorService?.sendControl(msg)
+                    Toast.makeText(this, "Requesting PC projection...", Toast.LENGTH_SHORT).show()
+                    extendDisplayStatus.text = "Request sent to PC"
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error sending ExtendDisplayMessage: ${e.message}", e)
+                    Toast.makeText(this, "Failed to send request: ${e.message}", Toast.LENGTH_SHORT).show()
+                }
             } else {
                 Toast.makeText(this, "Service not ready", Toast.LENGTH_SHORT).show()
             }
