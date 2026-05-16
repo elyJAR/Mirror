@@ -183,9 +183,13 @@ function applyState(state: any) {
   if (state.currentPeer) {
     peerEl.textContent = state.currentPeer;
     statusEl.textContent = 'Connected, waiting for stream...';
+    if (!isProjection) {
+      btnProject.style.display = 'block';
+    }
   } else {
     peerEl.textContent = 'No Peer';
     statusEl.textContent = 'Waiting for phone...';
+    btnProject.style.display = 'none';
   }
 
   if (state.currentPin) {
@@ -373,10 +377,35 @@ function sendTouch(action: number, e: MouseEvent) {
   }
 
   const rect = canvas.getBoundingClientRect();
-  const x = (e.clientX - rect.left) / rect.width;
-  const y = (e.clientY - rect.top) / rect.height;
+  const containerAspect = rect.width / rect.height;
+  const videoAspect = canvas.width / canvas.height;
+
+  let offsetX = 0;
+  let offsetY = 0;
+  let scaleX = 1;
+  let scaleY = 1;
+
+  if (containerAspect > videoAspect) {
+    // Letterboxed on sides
+    const actualWidth = rect.height * videoAspect;
+    offsetX = (rect.width - actualWidth) / 2;
+    scaleX = actualWidth;
+    scaleY = rect.height;
+  } else {
+    // Letterboxed top/bottom
+    const actualHeight = rect.width / videoAspect;
+    offsetY = (rect.height - actualHeight) / 2;
+    scaleX = rect.width;
+    scaleY = actualHeight;
+  }
+
+  const x = (e.clientX - rect.left - offsetX) / scaleX;
+  const y = (e.clientY - rect.top - offsetY) / scaleY;
   
   if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+    // Visual feedback
+    showTouchFeedback(e.clientX, e.clientY);
+
     window.electronAPI.sendControl({
       type: 'touch',
       action,
@@ -384,6 +413,22 @@ function sendTouch(action: number, e: MouseEvent) {
       y
     });
   }
+}
+
+function showTouchFeedback(x: number, y: number) {
+  const dot = document.createElement('div');
+  dot.style.position = 'absolute';
+  dot.style.left = `${x - 5}px`;
+  dot.style.top = `${y - 5}px`;
+  dot.style.width = '10px';
+  dot.style.height = '10px';
+  dot.style.background = '#00ff00';
+  dot.style.borderRadius = '50%';
+  dot.style.pointerEvents = 'none';
+  dot.style.zIndex = '1000';
+  dot.style.boxShadow = '0 0 10px #00ff00';
+  document.body.appendChild(dot);
+  setTimeout(() => dot.remove(), 200);
 }
 
 // Key events
