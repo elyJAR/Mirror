@@ -88,9 +88,6 @@ const createWindow = () => {
     mainWindow.loadFile(path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`));
   }
 
-  // Open DevTools by default to help troubleshoot the blank screen
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
-
   // Handle window close (hide instead of quit)
   mainWindow.on('close', (event) => {
     if (!isQuitting) {
@@ -343,11 +340,17 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           pinRequired: !isTrusted
         });
         
-        if (isTrusted) {
-          isPaired = true;
-          broadcastSyncState();
+        if (state.isPaired) {
+          pairingEl.style.display = 'none';
+          debugLogsEl.style.display = 'none'; // Hide logs when stream starts
+          inputEnabled = true;
+          statusEl.textContent = 'Authenticated. Starting stream...';
+        } else {
+          inputEnabled = false;
+          debugLogsEl.style.display = 'block'; // Show logs if pairing is needed
         }
-      } else if (inferredType === 'verify-pin') {
+      }
+      if (inferredType === 'verify-pin') {
         const isMatch = msg.pin === currentPin;
         sendControl(socket, {
           type: 'auth-result',
