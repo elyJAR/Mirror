@@ -104,10 +104,22 @@ class MirrorService : Service() {
 
     // --- Public API for MainActivity ---
 
+    private var cachedConfig: com.antigravity.mirror.stream.api.MirrorConfig? = null
+
+    fun setConfig(config: com.antigravity.mirror.stream.api.MirrorConfig) {
+        cachedConfig = config
+    }
+
     fun startDiscovery() = client.startDiscovery()
     fun stopDiscovery() = client.stopDiscovery()
-    fun connect(receiver: Receiver, config: com.antigravity.mirror.stream.api.MirrorConfig) = client.connect(receiver, config)
-    fun connectManual(host: String, port: Int, config: com.antigravity.mirror.stream.api.MirrorConfig) = client.connectManual(host, port, config)
+    fun connect(receiver: Receiver, config: com.antigravity.mirror.stream.api.MirrorConfig? = null) {
+        val finalConfig = config ?: cachedConfig ?: loadConfigFromPrefs(getSharedPreferences("mirror_settings", MODE_PRIVATE))
+        client.connect(receiver, finalConfig)
+    }
+    fun connectManual(host: String, port: Int, config: com.antigravity.mirror.stream.api.MirrorConfig? = null) {
+        val finalConfig = config ?: cachedConfig ?: loadConfigFromPrefs(getSharedPreferences("mirror_settings", MODE_PRIVATE))
+        client.connectManual(host, port, finalConfig)
+    }
     fun loadConfigFromPrefs(prefs: android.content.SharedPreferences) = client.loadConfigFromPrefs(prefs)
     fun onProjectionGranted(resultCode: Int, data: Intent) {
         Log.i(TAG, "=== onProjectionGranted called ===")

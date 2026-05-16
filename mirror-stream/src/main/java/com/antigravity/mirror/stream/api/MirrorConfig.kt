@@ -11,9 +11,8 @@ package com.antigravity.mirror.stream.api
  * @property width    target capture/encode width in pixels (clamped to device max).
  * @property height   target capture/encode height in pixels.
  * @property fps      target frame rate.
- * @property bitrateBps target encoder bitrate in bits per second.
- * @property codec    video codec; only [Codec.H264_BASELINE] is supported in v1.
  * @property transport which network transport to use; see [TransportPreference].
+ * @property latencyMode trade-off between speed and visual/audio stability.
  */
 data class MirrorConfig(
     val width: Int = 1920,
@@ -22,11 +21,22 @@ data class MirrorConfig(
     val bitrateBps: Int = 12_000_000,
     val codec: Codec = Codec.H264_BASELINE,
     val transport: TransportPreference = TransportPreference.AUTO,
+    val latencyMode: LatencyMode = LatencyMode.BALANCED,
 )
 
 /** Supported video codecs. v1 is H.264 Baseline only; H.265/AV1 are deferred. */
 enum class Codec {
     H264_BASELINE,
+}
+
+/** Trade-off between speed and stability. */
+enum class LatencyMode {
+    /** 720p, 6Mbps, smallest buffers. Prioritizes speed. */
+    LOW,
+    /** 1080p, 10Mbps, medium buffers. The default. */
+    BALANCED,
+    /** 1080p, 15Mbps, largest buffers. Prioritizes visual/audio quality. */
+    QUALITY,
 }
 
 /**

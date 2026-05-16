@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
 
     // Home panel
     private lateinit var discoverButton: Button
+    private lateinit var latencyToggleGroup: com.google.android.material.button.MaterialButtonToggleGroup
 
     // Scanning panel
     private lateinit var progressBar: ProgressBar

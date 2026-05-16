@@ -265,7 +265,7 @@ class MirrorClient(context: Context) {
                     mimeType = session.negotiatedCodec
                 )
                 Log.d(TAG, "VideoEncoder created successfully")
-                
+                encoder.configure(config.latencyMode)
                 Log.d(TAG, "Creating ScreenCaptureEngine")
                 val capture = ScreenCaptureEngine(projection, encoder)
                 Log.d(TAG, "ScreenCaptureEngine created successfully")
@@ -283,8 +283,8 @@ class MirrorClient(context: Context) {
                 // Start audio capture (Android 10+)
                 Log.d(TAG, "Creating AudioEncoder")
                 audioEncoder = AudioEncoder(projection).apply {
-                    Log.d(TAG, "Starting AudioEncoder")
-                    start { data, pts ->
+                    Log.d(TAG, "Starting AudioEncoder with latencyMode=${config.latencyMode}")
+                    start(config.latencyMode) { data, pts ->
                         session.audioSink.trySend(data)
                     }
                     Log.d(TAG, "AudioEncoder started")

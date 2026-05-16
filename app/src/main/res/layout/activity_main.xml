@@ -268,14 +268,75 @@
                             <TextView
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
-                                android:layout_marginTop="4dp"
                                 android:text="@string/cap_multi_desc"
                                 android:textColor="@color/kg_text_secondary"
                                 android:textSize="10sp" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
-
                 </LinearLayout>
+
+                <!-- Performance Mode section -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="32dp"
+                    android:layout_marginBottom="12dp"
+                    android:text="PERFORMANCE MODE"
+                    android:textColor="@color/kg_text_secondary"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.12"
+                    android:textAllCaps="true" />
+
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.Mirror.CardView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+                    
+                    <com.google.android.material.button.MaterialButtonToggleGroup
+                        android:id="@+id/latencyToggleGroup"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:padding="4dp"
+                        app:singleSelection="true"
+                        app:selectionRequired="true"
+                        app:checkedButton="@+id/btnBalanced">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnLowLatency"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Speed"
+                            android:textSize="12sp"
+                            android:textColor="@color/kg_text_primary"
+                            app:strokeColor="@color/kg_border" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnBalanced"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Balanced"
+                            android:textSize="12sp"
+                            android:textColor="@color/kg_text_primary"
+                            app:strokeColor="@color/kg_border" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnHighQuality"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="Quality"
+                            android:textSize="12sp"
+                            android:textColor="@color/kg_text_primary"
+                            app:strokeColor="@color/kg_border" />
+
+                    </com.google.android.material.button.MaterialButtonToggleGroup>
+                </com.google.android.material.card.MaterialCardView>
+
 
             </LinearLayout>
 

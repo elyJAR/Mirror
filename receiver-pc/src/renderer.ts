@@ -12,7 +12,12 @@ const statsEl = document.getElementById('stats')!;
 const hudEl = document.getElementById('hud')!;
 const pairingEl = document.getElementById('pairing')!;
 const pinEl = document.getElementById('pin')!;
+const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
 const canvas = document.getElementById('videoCanvas') as HTMLCanvasElement;
+
+btnProject.onclick = () => {
+  window.electronAPI.projectToExtended();
+};
 const ctx = canvas.getContext('2d')!;
 
 let hudVisible = false;
@@ -155,6 +160,7 @@ window.electronAPI.onPeerConnected((peer) => {
   statusEl.textContent = 'Connected, waiting for stream...';
   initDecoder(); // Re-init on new connection
   inputEnabled = false;
+  btnProject.style.display = 'block';
 });
 
 window.electronAPI.onPeerDisconnected(() => {
@@ -163,6 +169,7 @@ window.electronAPI.onPeerDisconnected(() => {
   isConfigured = false;
   pairingEl.style.display = 'none';
   inputEnabled = false;
+  btnProject.style.display = 'none';
 });
 
 window.electronAPI.onControlMessage((msg) => {

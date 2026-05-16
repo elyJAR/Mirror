@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard } from 'electron';
+import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard, screen } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { Bonjour } from 'bonjour-service';
@@ -352,7 +352,58 @@ function sendControl(socket: net.Socket, msg: Record<string, unknown>) {
   });
 }
 
+function cleanup() {
+  console.log('Cleaning up services...');
+  isQuitting = true;
+  
+  if (bonjour) {
+    try {
+      bonjour.destroy();
+      console.log('mDNS advertiser destroyed');
+    } catch (e) {
+      console.error('Failed to destroy bonjour:', e);
+    }
+  }
+
+  if (tcpServer) {
+    try {
+      tcpServer.close();
+      console.log('TCP server closed');
+    } catch (e) {
+      console.error('Failed to close TCP server:', e);
+    }
+  }
+
+  ipcMain.removeHandler('send-control');
+}
+
+function moveToNextDisplay() {
+  if (!mainWindow) return;
+
+  const displays = screen.getAllDisplays();
+  if (displays.length <= 1) {
+    console.log('No extended screen detected.');
+    return;
+  }
+
+  const currentBounds = mainWindow.getBounds();
+  const currentDisplay = screen.getDisplayMatching(currentBounds);
+  const nextDisplayIndex = (displays.findIndex(d => d.id === currentDisplay.id) + 1) % displays.length;
+  const nextDisplay = displays[nextDisplayIndex];
+
+  console.log(`Moving window to display ${nextDisplayIndex} at ${nextDisplay.bounds.x},${nextDisplay.bounds.y}`);
+  mainWindow.setBounds(nextDisplay.bounds);
+  mainWindow.maximize();
+  mainWindow.setFullScreen(true);
+}
+
+ipcMain.on('move-to-extended-screen', () => {
+  moveToNextDisplay();
+});
+
 app.on('ready', createWindow);
+
+app.on('before-quit', cleanup);
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

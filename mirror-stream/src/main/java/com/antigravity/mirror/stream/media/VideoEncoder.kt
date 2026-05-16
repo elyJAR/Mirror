@@ -94,7 +94,7 @@ class VideoEncoder(
     /**
      * Configures the [MediaCodec] encoder and returns its input [Surface].
      */
-    fun configure(): Surface {
+    fun configure(latencyMode: com.antigravity.mirror.stream.api.LatencyMode = com.antigravity.mirror.stream.api.LatencyMode.BALANCED): Surface {
         val format = MediaFormat.createVideoFormat(mimeType, width, height).apply {
             setInteger(
                 MediaFormat.KEY_COLOR_FORMAT,
@@ -104,6 +104,14 @@ class VideoEncoder(
             setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, 1)
             
+            // Low-latency optimizations
+            if (latencyMode == com.antigravity.mirror.stream.api.LatencyMode.LOW) {
+                setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_CBR)
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                    setInteger(MediaFormat.KEY_LATENCY, 0)
+                }
+            }
+
             if (mimeType == MediaFormat.MIMETYPE_VIDEO_AVC) {
                 setInteger(MediaFormat.KEY_PROFILE, MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline)
                 setInteger(MediaFormat.KEY_LEVEL, MediaCodecInfo.CodecProfileLevel.AVCLevel31)

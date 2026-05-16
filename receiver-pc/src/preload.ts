@@ -33,4 +33,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Actions to send to Main process
   sendControl: (msg: any) => ipcRenderer.invoke('send-control', msg),
+  projectToExtended: () => ipcRenderer.send('move-to-extended-screen'),
 });
