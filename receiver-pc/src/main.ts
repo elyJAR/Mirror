@@ -174,9 +174,7 @@ function startNetworkServices(window: BrowserWindow) {
     const displays = screen.getAllDisplays();
     console.log(`Found ${displays.length} displays`);
     if (displays.length < 2) {
-      console.log('No extended display found (displays.length < 2)');
-      // For testing, we could allow projecting to the primary display if it's the only one,
-      // but the requirements say "secondary monitor".
+      console.log('No secondary monitor found (displays.length < 2)');
       return false;
     }
 
@@ -186,54 +184,53 @@ function startNetworkServices(window: BrowserWindow) {
 
       console.log('Opening projection window on display:', extendedDisplay.id, 'bounds:', extendedDisplay.bounds);
 
-    projectionWindow = new BrowserWindow({
-      x: extendedDisplay.bounds.x,
-      y: extendedDisplay.bounds.y,
-      width: extendedDisplay.bounds.width,
-      height: extendedDisplay.bounds.height,
-      fullscreen: true,
-      autoHideMenuBar: true,
-      title: 'Mirror Projection',
-      webPreferences: {
-        preload: path.join(__dirname, 'preload.js'),
-      },
-    });
+      projectionWindow = new BrowserWindow({
+        x: extendedDisplay.bounds.x,
+        y: extendedDisplay.bounds.y,
+        width: extendedDisplay.bounds.width,
+        height: extendedDisplay.bounds.height,
+        fullscreen: true,
+        autoHideMenuBar: true,
+        title: 'Mirror Projection',
+        webPreferences: {
+          preload: path.join(__dirname, 'preload.js'),
+        },
+      });
 
-    const url = MAIN_WINDOW_VITE_DEV_SERVER_URL
-      ? `${MAIN_WINDOW_VITE_DEV_SERVER_URL}?mode=projection`
-      : `file://${path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)}?mode=projection`;
+      const url = MAIN_WINDOW_VITE_DEV_SERVER_URL
+        ? `${MAIN_WINDOW_VITE_DEV_SERVER_URL}?mode=projection`
+        : `file://${path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}/index.html`)}?mode=projection`;
 
-    projectionWindow.loadURL(url);
+      projectionWindow.loadURL(url);
 
-    projectionWindow.webContents.on('did-finish-load', () => {
-      if (lastSessionParams) {
-        projectionWindow?.webContents.send('control-message', {
-          type: 'hello-ack',
-          params: lastSessionParams,
-          receiver: 'Mirror PC (Projection)'
-        });
-      }
-      if (currentPeerAddress) {
-        projectionWindow?.webContents.send('peer-connected', { address: currentPeerAddress });
-      }
-      // Request a keyframe so the new window gets the parameter sets (SPS/PPS) immediately
+      projectionWindow.webContents.on('did-finish-load', () => {
+        if (lastSessionParams) {
+          projectionWindow?.webContents.send('control-message', {
+            type: 'hello-ack',
+            params: lastSessionParams,
+            receiver: 'Mirror PC (Projection)'
+          });
+        }
+        if (currentPeerAddress) {
+          projectionWindow?.webContents.send('peer-connected', { address: currentPeerAddress });
+        }
+        if (activeSocket && !activeSocket.destroyed) {
+          console.log('Requesting keyframe for new projection window...');
+          sendControl(activeSocket, { type: 'request-keyframe' });
+        }
+      });
+
+      projectionWindow.on('closed', () => {
+        projectionWindow = null;
+        if (mainWindow) mainWindow.webContents.send('projection-state', false);
+      });
+
+      const isProjecting = !!projectionWindow;
+      if (mainWindow) mainWindow.webContents.send('projection-state', isProjecting);
       if (activeSocket && !activeSocket.destroyed) {
-        console.log('Requesting keyframe for new projection window...');
-        sendControl(activeSocket, { type: 'request-keyframe' });
+        sendControl(activeSocket, { type: 'projection_state', active: isProjecting });
       }
-    });
-
-    projectionWindow.on('closed', () => {
-      projectionWindow = null;
-      if (mainWindow) mainWindow.webContents.send('projection-state', false);
-    });
-
-    const isProjecting = !!projectionWindow;
-    if (mainWindow) mainWindow.webContents.send('projection-state', isProjecting);
-    if (activeSocket && !activeSocket.destroyed) {
-      sendControl(activeSocket, { type: 'projection_state', active: isProjecting });
-    }
-    return isProjecting;
+      return isProjecting;
     } catch (e) {
       console.error('Failed to toggle projection:', e);
       return false;
