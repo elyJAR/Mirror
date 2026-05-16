@@ -93,6 +93,23 @@ class ScreenCaptureEngine(
     }
 
     /**
+     * Forces the virtual display to produce a new frame by briefly resizing it.
+     * Useful when a keyframe is requested but the screen is static.
+     */
+    fun nudge(width: Int, height: Int, dpi: Int) {
+        val vd = virtualDisplay ?: return
+        try {
+            Log.d(TAG, "Nudging virtual display to force frame refresh")
+            // Briefly resize by 1 pixel to trigger a redraw
+            vd.resize(width, height + 1, dpi)
+            // Immediately snap back to original resolution
+            vd.resize(width, height, dpi)
+        } catch (e: Exception) {
+            Log.w(TAG, "Failed to nudge virtual display: ${e.message}")
+        }
+    }
+
+    /**
      * Stops the encoder, releases the [VirtualDisplay], and stops the [MediaProjection].
      *
      * Requirements: 8.1

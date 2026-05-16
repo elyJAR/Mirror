@@ -202,6 +202,8 @@ class MirrorClient(context: Context) {
                             TransportEvent.RequestKeyframe -> {
                                 Log.d(TAG, "Peer requested keyframe")
                                 videoEncoder?.requestKeyframe()
+                                val config = lastConfig ?: MirrorConfig()
+                                captureEngine?.nudge(config.width, config.height, 160)
                             }
                             is TransportEvent.InjectTouch -> {
                                 inputInjector?.invoke(event)
