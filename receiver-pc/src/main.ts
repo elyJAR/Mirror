@@ -409,6 +409,9 @@ function startNetworkServices(window: BrowserWindow) {
   // Listen on all interfaces (IPv4 and IPv6)
   tcpServer.listen(8765, () => {
     console.log('TCP Server listening on port 8765 (all interfaces)');
+    const ip = getLocalIpAddress();
+    console.log(`[Network Setup] Detected physical local IP: ${ip || 'Unknown IP'}`);
+    console.log(`[mDNS Bonjour] Advertising on interface IP: ${ipAddr || 'Default (All Interfaces)'}`);
   });
 
   // Advertise service via mDNS
