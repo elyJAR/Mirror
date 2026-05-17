@@ -70,7 +70,9 @@ function stopUdpAdvertising() {
   if (udpClient) {
     try {
       udpClient.close();
-    } catch (e) {}
+    } catch (e) {
+      /* ignore socket close errors */
+    }
     udpClient = null;
   }
 }
@@ -521,6 +523,8 @@ app.on('will-quit', () => {
   stopUdpAdvertising();
   try {
     bonjour.destroy();
-  } catch (e) {}
+  } catch (e) {
+    /* ignore bonjour destroy errors */
+  }
 });
 
