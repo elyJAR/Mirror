@@ -9,17 +9,33 @@ import * as dgram from 'node:dgram';
 function getLocalIpAddress(): string | undefined {
   const interfaces = os.networkInterfaces();
   for (const name of Object.keys(interfaces)) {
-    // Skip virtual adapters commonly found on Windows/Linux
-    if (name.toLowerCase().includes('veth') || 
-        name.toLowerCase().includes('vmware') || 
-        name.toLowerCase().includes('virtual') ||
-        name.toLowerCase().includes('wsl')) {
+    const lowerName = name.toLowerCase();
+    // Skip virtual and VPN adapters commonly found on developer machines
+    if (lowerName.includes('veth') || 
+        lowerName.includes('vethernet') || 
+        lowerName.includes('vmware') || 
+        lowerName.includes('virtual') ||
+        lowerName.includes('virtualbox') ||
+        lowerName.includes('vbox') ||
+        lowerName.includes('wsl') ||
+        lowerName.includes('hyper-v') ||
+        lowerName.includes('docker') ||
+        lowerName.includes('vpn') ||
+        lowerName.includes('zerotier') ||
+        lowerName.includes('tailscale') ||
+        lowerName.includes('host-only') ||
+        lowerName.includes('pseudo') ||
+        lowerName.includes('loopback')) {
       continue;
     }
     const iface = interfaces[name];
     if (!iface) continue;
     for (const net of iface) {
       if (net.family === 'IPv4' && !net.internal) {
+        // Skip APIPA (Automatic Private IP Addressing) e.g., 169.254.x.x
+        if (net.address.startsWith('169.254.')) {
+          continue;
+        }
         return net.address;
       }
     }
@@ -107,7 +123,8 @@ let currentPeerAddress: string | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
-const bonjour = new Bonjour();
+const ipAddr = getLocalIpAddress();
+const bonjour = new Bonjour(ipAddr ? { interface: ipAddr } : undefined);
 let tcpServer: net.Server | null = null;
 const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 const advertisedName = `Mirror (${os.hostname()})`;
