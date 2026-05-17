@@ -147,7 +147,7 @@ class ProtocolClient(
         Log.i(TAG, "Connecting to $host:$port...")
         val socket = try {
             aSocket(selector).tcp().connect(host, port) {
-                tcpNoDelay = true
+                noDelay = true
                 keepAlive = true
             }
         } catch (e: Exception) {
