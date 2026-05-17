@@ -8,11 +8,13 @@ import { VitePlugin } from '@electron-forge/plugin-vite';
 import { FusesPlugin } from '@electron-forge/plugin-fuses';
 import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
+import path from 'path';
+
 const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     extraResource: [
-      'src/assets'
+      path.resolve(__dirname, 'src/assets/tray-icon.png')
     ]
   },
   rebuildConfig: {},

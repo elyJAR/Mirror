@@ -62,6 +62,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var panelStreaming: View
     private lateinit var panelConnecting: View
     private lateinit var panelError: View
+    private lateinit var swipeRefreshLayout: androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 
     // Home panel
     private lateinit var discoverButton: Button
@@ -189,6 +190,7 @@ class MainActivity : AppCompatActivity() {
         panelStreaming  = findViewById(R.id.panelStreaming)
         panelConnecting = findViewById(R.id.panelConnecting)
         panelError     = findViewById(R.id.panelError)
+        swipeRefreshLayout = findViewById(R.id.swipeRefreshLayout)
 
         // Home
         discoverButton = findViewById(R.id.discoverButton)
@@ -281,6 +283,20 @@ class MainActivity : AppCompatActivity() {
         latencyToggleGroup = findViewById(R.id.latencyToggleGroup)
         latencyToggleGroupStreaming = findViewById(R.id.latencyToggleGroupStreaming)
         setupLatencyToggles()
+
+        // Use custom premium Kinetic Glass accent colors for the refresh indicator
+        swipeRefreshLayout.setColorSchemeColors(
+            androidx.core.content.ContextCompat.getColor(this, R.color.kg_accent)
+        )
+
+        swipeRefreshLayout.setOnRefreshListener {
+            val state = mirrorService?.getState()?.value
+            if (state is MirrorState.Discovering || state is MirrorState.ReceiversFound || state is MirrorState.Idle || state is MirrorState.Error) {
+                mirrorService?.startDiscovery()
+            } else {
+                swipeRefreshLayout.isRefreshing = false
+            }
+        }
 
         checkAndRequestPermissions()
     }
@@ -499,6 +515,10 @@ class MainActivity : AppCompatActivity() {
         if (state !is MirrorState.AwaitingPairing) {
             pinDialog?.dismiss()
             pinDialog = null
+        }
+
+        if (state !is MirrorState.Discovering) {
+            swipeRefreshLayout.isRefreshing = false
         }
 
         when (state) {

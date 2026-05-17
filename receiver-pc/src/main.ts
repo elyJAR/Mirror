@@ -147,9 +147,12 @@ const createWindow = () => {
 
   mainWindow.webContents.on('did-finish-load', () => {
     const ip = getLocalIpAddress();
-    if (ip) {
-      mainWindow?.webContents.send('local-ip', `${ip}:8765`);
-    }
+    mainWindow?.webContents.send('local-ip', {
+      ip: ip ? `${ip}:8765` : 'Unknown IP',
+      deviceName: advertisedName,
+      execPath: process.execPath,
+      isPackaged: app.isPackaged
+    });
   });
 
   startNetworkServices(mainWindow);

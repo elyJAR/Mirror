@@ -82,6 +82,251 @@
         border: 1px solid #333;
         display: block;
       }
+      
+      /* --- Premium Waiting Panel Styles --- */
+      #waiting-panel {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(15, 15, 20, 0.85);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        padding: 40px;
+        border-radius: 20px;
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), 0 0 40px rgba(0, 122, 255, 0.1);
+        z-index: 90;
+        width: 380px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        transition: opacity 0.3s ease;
+      }
+      .app-title {
+        font-size: 24px;
+        font-weight: 700;
+        margin: 15px 0 5px 0;
+        background: linear-gradient(135deg, #fff 30%, #a5c7f7 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+      }
+      .device-pill {
+        font-size: 13px;
+        color: #8a8d9a;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 4px 12px;
+        border-radius: 12px;
+        margin-bottom: 25px;
+        border: 1px solid rgba(255, 255, 255, 0.03);
+      }
+      .connection-box {
+        width: 100%;
+        background: rgba(0, 122, 255, 0.04);
+        border: 1px solid rgba(0, 122, 255, 0.15);
+        border-radius: 12px;
+        padding: 15px;
+        box-sizing: border-box;
+        margin-bottom: 20px;
+        text-align: left;
+      }
+      .ip-label {
+        font-size: 11px;
+        color: #007AFF;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .ip-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      #waiting-ip {
+        font-family: monospace;
+        font-size: 16px;
+        font-weight: bold;
+        color: #fff;
+      }
+      .action-btn {
+        background: #007AFF;
+        border: none;
+        color: #fff;
+        padding: 5px 12px;
+        border-radius: 6px;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+      .action-btn:hover {
+        background: #0062cc;
+      }
+      .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #8a8d9a;
+        margin-bottom: 20px;
+      }
+      .dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #4ade80;
+      }
+      .dot.pulse {
+        animation: status-pulse 1.8s infinite;
+      }
+      @keyframes status-pulse {
+        0% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7);
+        }
+        70% {
+          transform: scale(1);
+          box-shadow: 0 0 0 6px rgba(74, 222, 128, 0);
+        }
+        100% {
+          transform: scale(0.95);
+          box-shadow: 0 0 0 0 rgba(74, 222, 128, 0);
+        }
+      }
+      .radar-container {
+        position: relative;
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .radar-logo {
+        position: relative;
+        z-index: 2;
+        background: #141418;
+        border-radius: 50%;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid rgba(0, 122, 255, 0.2);
+        box-shadow: 0 0 15px rgba(0, 122, 255, 0.15);
+      }
+      .radar-ring {
+        position: absolute;
+        border: 1px solid rgba(0, 122, 255, 0.3);
+        border-radius: 50%;
+        animation: radar-pulse 3s infinite linear;
+        opacity: 0;
+      }
+      .ring1 { animation-delay: 0s; }
+      .ring2 { animation-delay: 1s; }
+      .ring3 { animation-delay: 2s; }
+      @keyframes radar-pulse {
+        0% {
+          width: 50px;
+          height: 50px;
+          opacity: 0.6;
+        }
+        100% {
+          width: 110px;
+          height: 110px;
+          opacity: 0;
+        }
+      }
+
+      /* Troubleshooting Card styling */
+      .trouble-card {
+        width: 100%;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        margin-top: 10px;
+        overflow: hidden;
+        text-align: left;
+      }
+      .trouble-header {
+        padding: 12px 15px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #b3b5c6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        cursor: pointer;
+        user-select: none;
+        transition: background 0.2s;
+      }
+      .trouble-header:hover {
+        background: rgba(255, 255, 255, 0.04);
+        color: #fff;
+      }
+      .trouble-content {
+        padding: 0 15px;
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out, padding 0.3s ease-out;
+        font-size: 11.5px;
+        line-height: 1.45;
+        color: #a5a7b6;
+        border-top: 1px solid transparent;
+      }
+      .trouble-content.expanded {
+        padding: 15px;
+        max-height: 350px;
+        border-top: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      .trouble-content p {
+        margin: 0 0 8px 0;
+      }
+      .trouble-content p strong {
+        color: #fff;
+      }
+      .explanation {
+        color: #8c8f9f;
+      }
+      .powershell-section {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 8px;
+        padding: 10px;
+        margin: 12px 0;
+      }
+      .ps-label {
+        font-size: 9px;
+        color: #8a8d9a;
+        text-transform: uppercase;
+        font-weight: bold;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
+      .ps-copy-btn {
+        width: 100%;
+        background: rgba(0, 122, 255, 0.15);
+        border: 1px dashed rgba(0, 122, 255, 0.4);
+        color: #007AFF;
+        padding: 8px;
+        border-radius: 6px;
+        font-family: system-ui, -apple-system, sans-serif;
+        font-size: 11px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .ps-copy-btn:hover {
+        background: rgba(0, 122, 255, 0.25);
+        border-color: #007AFF;
+      }
+      .tip {
+        font-size: 10px;
+        color: #6a6d7a;
+        margin: 0;
+      }
     </style>
   </head>
   <body>
@@ -90,6 +335,59 @@
         <button id="btnProject" style="background: rgba(0,122,255,0.7); border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; display: none;">Project to Extended</button>
     </div>
     <canvas id="videoCanvas"></canvas>
+    
+    <!-- Premium Waiting Screen -->
+    <div id="waiting-panel">
+        <div class="radar-container">
+            <div class="radar-ring ring1"></div>
+            <div class="radar-ring ring2"></div>
+            <div class="radar-ring ring3"></div>
+            <div class="radar-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+            </div>
+        </div>
+        <h2 class="app-title">Mirror Receiver</h2>
+        <div id="waiting-device-name" class="device-pill">Mirror Broadcasting</div>
+        
+        <div class="connection-box">
+            <div class="ip-label">Local Connection Address</div>
+            <div class="ip-row">
+                <span id="waiting-ip">Detecting network address...</span>
+                <button id="btnCopyIp" class="action-btn" style="display: none;">Copy</button>
+            </div>
+        </div>
+
+        <div class="status-indicator">
+            <span class="dot pulse"></span>
+            <span id="waiting-status-text">Broadcasting over Wi-Fi Subnet & mDNS...</span>
+        </div>
+
+        <!-- Troubleshooting Panel -->
+        <div class="trouble-card">
+            <div class="trouble-header" id="troubleHeader">
+                <span>Troubleshoot Connection / Firewall</span>
+                <svg id="troubleArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.3s;">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="trouble-content" id="troubleContent">
+                <p><strong>Phone cannot discover PC?</strong></p>
+                <p class="explanation">
+                    When packaged as an <code>.exe</code> (built on GitHub), Windows Defender Firewall blocks its incoming TCP/UDP connections by default, while the development <code>electron.exe</code> was allowed.
+                </p>
+                <div class="powershell-section">
+                    <div class="ps-label">Windows PowerShell Fix Command</div>
+                    <button id="btnCopyPs" class="ps-copy-btn">Copy Firewall Fix Command</button>
+                </div>
+                <p class="tip">Paste the copied command into an <strong>Administrator PowerShell</strong> window to instantly add the firewall exceptions.</p>
+            </div>
+        </div>
+    </div>
+
     <div id="pairing">
         <div style="font-size: 18px; color: #888;">Enter PIN on your phone</div>
         <div id="pin">----</div>

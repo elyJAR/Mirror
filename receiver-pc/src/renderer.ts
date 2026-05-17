@@ -18,6 +18,16 @@ const ctx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const btnProject = document.getElementById('btnProject') as HTMLButtonElement;
 const audioStatusEl = document.getElementById('audio-status') as HTMLElement;
 
+// Waiting Panel elements
+const waitingPanelEl = document.getElementById('waiting-panel') as HTMLElement;
+const waitingIpEl = document.getElementById('waiting-ip') as HTMLElement;
+const waitingDeviceNameEl = document.getElementById('waiting-device-name') as HTMLElement;
+const btnCopyIp = document.getElementById('btnCopyIp') as HTMLButtonElement;
+const btnCopyPs = document.getElementById('btnCopyPs') as HTMLButtonElement;
+const troubleHeader = document.getElementById('troubleHeader') as HTMLElement;
+const troubleContent = document.getElementById('troubleContent') as HTMLElement;
+const troubleArrow = document.getElementById('troubleArrow') as HTMLElement;
+
 let hudVisible = false;
 const isProjectionMode = new URLSearchParams(window.location.search).get('mode') === 'projection';
 
@@ -25,6 +35,7 @@ if (isProjectionMode) {
   pairingEl.style.display = 'none';
   hudEl.style.display = 'none';
   statusEl.style.display = 'none';
+  if (waitingPanelEl) waitingPanelEl.style.display = 'none';
   const controls = document.getElementById('controls');
   if (controls) controls.style.display = 'none';
   const logs = document.getElementById('debug-logs');
@@ -226,19 +237,102 @@ window.electronAPI.onAudioFrame((payload: Uint8Array, timestamp: number) => {
   }
 });
 
-// Initial setup
+// Initial setup and element visibility
 initDecoder();
 statusEl.textContent = 'Waiting for phone...';
+if (waitingPanelEl && !isProjectionMode) {
+  waitingPanelEl.style.display = 'flex';
+}
+
+// Variables for dynamic commands
+let runningExecPath = '';
+
+// --- Waiting Panel Interaction Listeners ---
+if (troubleHeader && troubleContent && troubleArrow) {
+  troubleHeader.addEventListener('click', () => {
+    const isExpanded = troubleContent.classList.toggle('expanded');
+    troubleArrow.style.transform = isExpanded ? 'rotate(180deg)' : 'rotate(0deg)';
+  });
+}
+
+if (btnCopyIp && waitingIpEl) {
+  btnCopyIp.addEventListener('click', () => {
+    const ipText = waitingIpEl.textContent || '';
+    navigator.clipboard.writeText(ipText).then(() => {
+      btnCopyIp.textContent = 'Copied!';
+      btnCopyIp.style.background = '#4ade80';
+      setTimeout(() => {
+        btnCopyIp.textContent = 'Copy';
+        btnCopyIp.style.background = '#007AFF';
+      }, 2000);
+    });
+  });
+}
+
+if (btnCopyPs) {
+  btnCopyPs.addEventListener('click', () => {
+    if (!runningExecPath) {
+      btnCopyPs.textContent = 'Error: Path not resolved!';
+      return;
+    }
+    const escapedPath = runningExecPath.replace(/'/g, "''");
+    const powershellCmd = `Start-Process powershell -Verb runAs -ArgumentList "-NoExit -Command New-NetFirewallRule -DisplayName 'Mirror Receiver TCP' -Direction Inbound -Program '${escapedPath}' -Action Allow -Protocol TCP -LocalPort 8765; New-NetFirewallRule -DisplayName 'Mirror Receiver UDP' -Direction Inbound -Program '${escapedPath}' -Action Allow -Protocol UDP -LocalPort 8768"`;
+    
+    navigator.clipboard.writeText(powershellCmd).then(() => {
+      btnCopyPs.textContent = 'Copied! Run in Admin PowerShell';
+      btnCopyPs.style.background = 'rgba(74, 222, 128, 0.15)';
+      btnCopyPs.style.borderColor = '#4ade80';
+      btnCopyPs.style.color = '#4ade80';
+      setTimeout(() => {
+        btnCopyPs.textContent = 'Copy Firewall Fix Command';
+        btnCopyPs.style.background = 'rgba(0, 122, 255, 0.15)';
+        btnCopyPs.style.borderColor = 'rgba(0, 122, 255, 0.4)';
+        btnCopyPs.style.color = '#007AFF';
+      }, 4000);
+    });
+  });
+}
 
 // --- IPC Event Handlers ---
 
-window.electronAPI.onLocalIp((ip) => {
-  statusEl.textContent = `Waiting for phone at ${ip}...`;
+window.electronAPI.onLocalIp((data: { ip: string; deviceName: string; execPath: string; isPackaged: boolean } | string) => {
+  let ipStr = '';
+  let deviceName = 'Mirror Receiver';
+  
+  if (data && typeof data === 'object') {
+    ipStr = data.ip || 'Unknown IP';
+    deviceName = data.deviceName || 'Mirror Receiver';
+    runningExecPath = data.execPath || '';
+    
+    // Update waiting screen dynamic values
+    if (waitingIpEl) waitingIpEl.textContent = ipStr;
+    if (waitingDeviceNameEl) waitingDeviceNameEl.textContent = deviceName;
+    if (btnCopyIp) btnCopyIp.style.display = 'block';
+    
+    // Adjust firewall troubleshooting based on OS
+    const psSection = document.querySelector('.powershell-section') as HTMLElement;
+    const tipEl = document.querySelector('.tip') as HTMLElement;
+    const explanationEl = document.querySelector('.explanation') as HTMLElement;
+    
+    if (runningExecPath.includes('\\') || runningExecPath.includes(':')) {
+      if (psSection) psSection.style.display = 'block';
+    } else {
+      if (psSection) psSection.style.display = 'none';
+      if (tipEl) tipEl.textContent = 'Make sure your firewall allows incoming connections on TCP port 8765 and UDP port 8768.';
+      if (explanationEl) explanationEl.textContent = 'Your system firewall may block incoming network packets by default. Please configure your system firewall to allow incoming traffic on ports 8765 and 8768.';
+    }
+  } else {
+    ipStr = data;
+    if (waitingIpEl) waitingIpEl.textContent = ipStr;
+  }
+  
+  statusEl.textContent = `Waiting for phone at ${ipStr}...`;
 });
 
 window.electronAPI.onPeerConnected((peer) => {
   peerEl.textContent = peer.address;
   statusEl.textContent = 'Connected, waiting for stream...';
+  if (waitingPanelEl) waitingPanelEl.style.display = 'none'; // Hide waiting screen
   baseAndroidTs = null; // Reset sync
   videoBaseAndroidTs = null; // Reset fallback sync
   nextAudioPlayTime = 0; // Reset play schedule
@@ -250,6 +344,9 @@ window.electronAPI.onPeerConnected((peer) => {
 window.electronAPI.onPeerDisconnected(() => {
   peerEl.textContent = 'No Peer';
   statusEl.textContent = 'Waiting for phone...';
+  if (waitingPanelEl && !isProjectionMode) {
+    waitingPanelEl.style.display = 'flex'; // Show waiting screen
+  }
   isConfigured = false;
   pairingEl.style.display = 'none';
   inputEnabled = false;
@@ -421,6 +518,7 @@ window.electronAPI.onPairingPin((pin) => {
 
 window.electronAPI.onPairingSuccess(() => {
   pairingEl.style.display = 'none';
+  if (waitingPanelEl) waitingPanelEl.style.display = 'none'; // Hide waiting screen
   statusEl.textContent = 'Authenticated. Starting stream...';
   inputEnabled = true;
   // Pairing success fires right after user interaction (PIN submit) — safe to
