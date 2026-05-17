@@ -33,7 +33,21 @@ let udpTimer: NodeJS.Timeout | null = null;
 function startUdpAdvertising() {
   stopUdpAdvertising();
   
-  udpClient = dgram.createSocket('udp4');
+  const client = dgram.createSocket('udp4');
+  udpClient = client;
+  
+  client.on('error', (err) => {
+    console.warn('[UDP Broadcast] Socket error:', err);
+  });
+
+  client.bind(0, () => {
+    try {
+      client.setBroadcast(true);
+      console.log('[UDP Broadcast] Socket bound to random port and broadcast enabled');
+    } catch (err) {
+      console.warn('[UDP Broadcast] Failed to enable broadcast on bind:', err);
+    }
+  });
   
   udpTimer = setInterval(() => {
     try {
@@ -48,10 +62,8 @@ function startUdpAdvertising() {
       
       const payload = Buffer.from(message);
       
-      udpClient?.setBroadcast(true);
-      
       // Broadcast to local subnet on port 8768
-      udpClient?.send(payload, 0, payload.length, 8768, '255.255.255.255', (err) => {
+      client.send(payload, 0, payload.length, 8768, '255.255.255.255', (err) => {
         if (err) {
           console.warn('[UDP Broadcast] Failed to send broadcast:', err);
         }
