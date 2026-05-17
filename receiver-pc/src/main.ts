@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard, screen } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { Bonjour } from 'bonjour-service';
+import { Bonjour, ServiceConfig } from 'bonjour-service';
 import * as net from 'net';
 import * as os from 'node:os';
 import * as dgram from 'node:dgram';
@@ -124,7 +124,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 const ipAddr = getLocalIpAddress();
-const bonjour = new Bonjour(ipAddr ? { interface: ipAddr } as any : undefined);
+const bonjour = new Bonjour(ipAddr ? { interface: ipAddr } as unknown as Partial<ServiceConfig> : undefined);
 let tcpServer: net.Server | null = null;
 const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 const advertisedName = `Mirror (${os.hostname()})`;
