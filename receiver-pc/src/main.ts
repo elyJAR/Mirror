@@ -4,6 +4,7 @@ import started from 'electron-squirrel-startup';
 import { Bonjour } from 'bonjour-service';
 import * as net from 'net';
 import * as os from 'node:os';
+import * as dgram from 'node:dgram';
 
 function getLocalIpAddress(): string | undefined {
   const interfaces = os.networkInterfaces();
@@ -25,6 +26,55 @@ function getLocalIpAddress(): string | undefined {
   }
   return undefined;
 }
+
+let udpClient: dgram.Socket | null = null;
+let udpTimer: NodeJS.Timeout | null = null;
+
+function startUdpAdvertising() {
+  stopUdpAdvertising();
+  
+  udpClient = dgram.createSocket('udp4');
+  
+  udpTimer = setInterval(() => {
+    try {
+      const ip = getLocalIpAddress();
+      if (!ip) return;
+      
+      const message = JSON.stringify({
+        name: advertisedName,
+        port: 8765,
+        ip: ip
+      });
+      
+      const payload = Buffer.from(message);
+      
+      udpClient?.setBroadcast(true);
+      
+      // Broadcast to local subnet on port 8768
+      udpClient?.send(payload, 0, payload.length, 8768, '255.255.255.255', (err) => {
+        if (err) {
+          console.warn('[UDP Broadcast] Failed to send broadcast:', err);
+        }
+      });
+    } catch (err) {
+      console.warn('[UDP Broadcast] Error in advertising loop:', err);
+    }
+  }, 2000);
+}
+
+function stopUdpAdvertising() {
+  if (udpTimer) {
+    clearInterval(udpTimer);
+    udpTimer = null;
+  }
+  if (udpClient) {
+    try {
+      udpClient.close();
+    } catch (e) {}
+    udpClient = null;
+  }
+}
+
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
@@ -339,6 +389,14 @@ function startNetworkServices(window: BrowserWindow) {
   } catch (error) {
     console.warn('mDNS advertise failed; continuing with TCP server only:', error);
   }
+
+  // Start UDP broadcast advertising for hotspots/fallback discovery
+  try {
+    startUdpAdvertising();
+    console.log('[UDP Broadcast] Started subnet advertising on port 8768');
+  } catch (error) {
+    console.warn('[UDP Broadcast] Failed to start UDP advertising:', error);
+  }
 }
 
 function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: BrowserWindow, onToggleProjection: () => void, onPinFailure: () => boolean): boolean {
@@ -458,3 +516,11 @@ app.on('activate', () => {
     createWindow();
   }
 });
+
+app.on('will-quit', () => {
+  stopUdpAdvertising();
+  try {
+    bonjour.destroy();
+  } catch (e) {}
+});
+
