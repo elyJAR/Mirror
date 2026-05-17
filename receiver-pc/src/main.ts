@@ -1,7 +1,9 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard, screen } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
+import type { NetworkInterfaceInfo } from 'node:os';
 
+// eslint-disable-next-line @typescript-eslint/no-var-requires
 const os = require('os');
 
 // Monkey-patch os.networkInterfaces to exclude virtual/VPN adapters and APIPA addresses.
@@ -10,7 +12,7 @@ const os = require('os');
 const originalNetworkInterfaces = os.networkInterfaces;
 os.networkInterfaces = () => {
   const interfaces = originalNetworkInterfaces();
-  const filtered: NodeJS.Dict<os.NetworkInterfaceInfo[]> = {};
+  const filtered: NodeJS.Dict<NetworkInterfaceInfo[]> = {};
   for (const name of Object.keys(interfaces)) {
     const lowerName = name.toLowerCase();
     if (lowerName.includes('veth') || 
@@ -32,7 +34,7 @@ os.networkInterfaces = () => {
     }
     const iface = interfaces[name];
     if (iface) {
-      const filteredIface = iface.filter(net => {
+      const filteredIface = iface.filter((net: NetworkInterfaceInfo) => {
         if (net.family === 'IPv4') {
           return !net.address.startsWith('169.254.');
         }
@@ -62,6 +64,17 @@ function getLocalIpAddress(): string | undefined {
     }
   }
   return undefined;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sendToWindow(window: BrowserWindow | null, channel: string, ...args: any[]) {
+  if (window && !window.isDestroyed()) {
+    try {
+      window.webContents.send(channel, ...args);
+    } catch (e) {
+      console.warn(`Failed to send to window on channel ${channel}:`, e);
+    }
+  }
 }
 
 let udpClient: dgram.Socket | null = null;
@@ -143,6 +156,7 @@ let lastSessionParams: Record<string, unknown> | null = null;
 let currentPeerAddress: string | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let activeSocket: net.Socket | null = null;
 
 const ipAddr = getLocalIpAddress();
 const bonjour = new Bonjour(ipAddr ? { interface: ipAddr } as unknown as Partial<ServiceConfig> : undefined);
@@ -183,9 +197,13 @@ const createWindow = () => {
     }
   });
 
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
   mainWindow.webContents.on('did-finish-load', () => {
     const ip = getLocalIpAddress();
-    mainWindow?.webContents.send('local-ip', {
+    sendToWindow(mainWindow, 'local-ip', {
       ip: ip ? `${ip}:8765` : 'Unknown IP',
       deviceName: advertisedName,
       execPath: process.execPath,
@@ -261,15 +279,13 @@ app.on('second-instance', () => {
 function startNetworkServices(window: BrowserWindow) {
   if (tcpServer) return;
 
-  let activeSocket: net.Socket | null = null;
-
   const toggleProjection = async () => {
     console.log('toggleProjection triggered. Current window state:', !!projectionWindow);
     if (projectionWindow) {
       console.log('Closing existing projection window');
       projectionWindow.close();
       projectionWindow = null;
-      if (mainWindow) mainWindow.webContents.send('projection-state', false);
+      sendToWindow(mainWindow, 'projection-state', false);
       if (activeSocket && !activeSocket.destroyed) {
         sendControl(activeSocket, { type: 'projection_state', active: false });
       }
@@ -310,14 +326,14 @@ function startNetworkServices(window: BrowserWindow) {
 
       projectionWindow.webContents.on('did-finish-load', () => {
         if (lastSessionParams) {
-          projectionWindow?.webContents.send('control-message', {
+          sendToWindow(projectionWindow, 'control-message', {
             type: 'hello-ack',
             params: lastSessionParams,
             receiver: 'Mirror PC (Projection)'
           });
         }
         if (currentPeerAddress) {
-          projectionWindow?.webContents.send('peer-connected', { address: currentPeerAddress });
+          sendToWindow(projectionWindow, 'peer-connected', { address: currentPeerAddress });
         }
         if (activeSocket && !activeSocket.destroyed) {
           console.log('Requesting keyframe for new projection window...');
@@ -327,11 +343,11 @@ function startNetworkServices(window: BrowserWindow) {
 
       projectionWindow.on('closed', () => {
         projectionWindow = null;
-        if (mainWindow) mainWindow.webContents.send('projection-state', false);
+        sendToWindow(mainWindow, 'projection-state', false);
       });
 
       const isProjecting = !!projectionWindow;
-      if (mainWindow) mainWindow.webContents.send('projection-state', isProjecting);
+      sendToWindow(mainWindow, 'projection-state', isProjecting);
       if (activeSocket && !activeSocket.destroyed) {
         sendControl(activeSocket, { type: 'projection_state', active: isProjecting });
       }
@@ -352,8 +368,8 @@ function startNetworkServices(window: BrowserWindow) {
     console.log('Phone connected:', remoteAddress);
     
     // Notify renderer of connection and current PIN
-    window.webContents.send('peer-connected', { address: remoteAddress });
-    window.webContents.send('pairing-pin', currentPin);
+    sendToWindow(mainWindow, 'peer-connected', { address: remoteAddress });
+    sendToWindow(mainWindow, 'pairing-pin', currentPin);
     
     let buffer = Buffer.alloc(0);
     let pinAttempts = 0;
@@ -390,7 +406,7 @@ function startNetworkServices(window: BrowserWindow) {
         const payload = buffer.subarray(5, 5 + length);
         buffer = buffer.slice(5 + length);
         
-        const shouldContinue = handleFrame(tag, payload, socket, window, toggleProjection, () => {
+        const shouldContinue = handleFrame(tag, payload, socket, mainWindow || window, toggleProjection, () => {
           pinAttempts++;
           return pinAttempts >= MAX_PIN_ATTEMPTS;
         });
@@ -405,7 +421,7 @@ function startNetworkServices(window: BrowserWindow) {
 
     socket.on('close', () => {
       console.log('Phone disconnected');
-      window.webContents.send('peer-disconnected');
+      sendToWindow(mainWindow, 'peer-disconnected');
       ipcMain.removeHandler('send-control'); // Cleanup handler
     });
 
@@ -422,9 +438,7 @@ function startNetworkServices(window: BrowserWindow) {
       console.error('TCP server error:', error);
     }
 
-    if (mainWindow) {
-      window.webContents.send('peer-disconnected');
-    }
+    sendToWindow(mainWindow, 'peer-disconnected');
   });
 
   // Listen on all interfaces (IPv4 and IPv6)
@@ -471,8 +485,8 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
           ? msg.type
           : (typeof msg.device === 'string' && Array.isArray(msg.codecs) ? 'hello' : undefined);
       
-      if (mainWindow) mainWindow.webContents.send('control-message', msg);
-      if (projectionWindow) projectionWindow.webContents.send('control-message', msg);
+      sendToWindow(mainWindow, 'control-message', msg);
+      sendToWindow(projectionWindow, 'control-message', msg);
       
       // Automatic handshake response
       if (inferredType === 'hello') {
@@ -494,8 +508,8 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         lastSessionParams = { width: 1280, height: 720, fps: 30, codec: chosenCodec };
         
         if (isTrusted) {
-          if (mainWindow) mainWindow.webContents.send('pairing-success');
-          if (projectionWindow) projectionWindow.webContents.send('pairing-success');
+          sendToWindow(mainWindow, 'pairing-success');
+          sendToWindow(projectionWindow, 'pairing-success');
         }
       } else if (inferredType === 'verify-pin') {
         const isMatch = msg.pin === currentPin;
@@ -507,8 +521,8 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
         
         if (isMatch) {
           trustedDevices.add(socket.remoteAddress || 'unknown');
-          if (mainWindow) mainWindow.webContents.send('pairing-success');
-          if (projectionWindow) projectionWindow.webContents.send('pairing-success');
+          sendToWindow(mainWindow, 'pairing-success');
+          sendToWindow(projectionWindow, 'pairing-success');
         } else {
           if (onPinFailure()) {
             return false; // Signal to disconnect
@@ -531,15 +545,15 @@ function handleFrame(tag: number, payload: Buffer, socket: net.Socket, window: B
     if (payload.length >= 8) {
       const ts = payload.readBigInt64BE(0);
       const data = payload.subarray(8);
-      if (mainWindow) mainWindow.webContents.send('video-frame', data, Number(ts));
-      if (projectionWindow) projectionWindow.webContents.send('video-frame', data, Number(ts));
+      sendToWindow(mainWindow, 'video-frame', data, Number(ts));
+      sendToWindow(projectionWindow, 'video-frame', data, Number(ts));
     }
   } else if (tag === 0x03) { // Audio Data (with 8-byte timestamp)
     if (payload.length >= 8) {
       const ts = payload.readBigInt64BE(0);
       const data = payload.subarray(8);
-      if (mainWindow) mainWindow.webContents.send('audio-frame', data, Number(ts));
-      if (projectionWindow) projectionWindow.webContents.send('audio-frame', data, Number(ts));
+      sendToWindow(mainWindow, 'audio-frame', data, Number(ts));
+      sendToWindow(projectionWindow, 'audio-frame', data, Number(ts));
     }
   }
   return true;
@@ -572,6 +586,30 @@ app.on('window-all-closed', () => {
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+app.on('before-quit', () => {
+  isQuitting = true;
+  
+  if (activeSocket) {
+    try {
+      activeSocket.destroy();
+      console.log('[Shutdown] Closed active TCP socket connection');
+    } catch (e) {
+      console.warn('[Shutdown] Failed to destroy active socket:', e);
+    }
+    activeSocket = null;
+  }
+  
+  if (tcpServer) {
+    try {
+      tcpServer.close();
+      console.log('[Shutdown] Closed TCP server');
+    } catch (e) {
+      console.warn('[Shutdown] Failed to close TCP server:', e);
+    }
+    tcpServer = null;
   }
 });
 
