@@ -124,7 +124,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 
 const ipAddr = getLocalIpAddress();
-const bonjour = new Bonjour(ipAddr ? { interface: ipAddr } : undefined);
+const bonjour = new Bonjour(ipAddr ? { interface: ipAddr } as any : undefined);
 let tcpServer: net.Server | null = null;
 const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 const advertisedName = `Mirror (${os.hostname()})`;
