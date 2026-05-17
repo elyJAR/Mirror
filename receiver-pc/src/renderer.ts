@@ -49,39 +49,19 @@ let isConfigured = false;
 let frameCount = 0;
 let bytesReceived = 0;
 let lastStatsTime = Date.now();
+
+// Shared AV sync base (anchored to audio master clock)
 let baseAndroidTs: number | null = null;
 let baseAudioContextTime = 0;
-const SYNC_DELAY_US = 80000; // 80ms buffer for sync (reduced from 150ms)
+let lastAudioFrameTime = 0; // JS timestamp when last audio frame was processed
 
-function getPlaybackTime(ts: number): number {
-  if (!audioCtx) return 0;
-  
-  if (baseAndroidTs === null) {
-    baseAndroidTs = ts;
-    baseAudioContextTime = audioCtx.currentTime + SYNC_DELAY_US / 1000000;
-    return baseAudioContextTime;
-  }
+// Video sync base (used when audio is inactive/absent)
+let videoBaseAndroidTs: number | null = null;
+let videoBaseAudioContextTime = 0;
+let lastVideoFrameTime = 0; // JS timestamp when last video frame was processed
 
-  const rawTargetTime = baseAudioContextTime + (ts - baseAndroidTs) / 1000000;
-  const drift = rawTargetTime - (audioCtx.currentTime + SYNC_DELAY_US / 1000000);
-
-  // If drift is more than 20ms, slowly nudge the base to catch up/slow down.
-  // We adjust by 1ms for every frame, which is subtle enough to avoid pitch shifts.
-  if (Math.abs(drift) > 0.020) {
-    const adjustment = drift > 0 ? -0.001 : 0.001;
-    baseAudioContextTime += adjustment;
-  }
-  
-  // If drift is extreme (>500ms), do a hard reset to recover immediately.
-  if (Math.abs(drift) > 0.500) {
-    console.warn(`Extreme drift detected (${(drift * 1000).toFixed(0)}ms), resetting sync base.`);
-    baseAndroidTs = ts;
-    baseAudioContextTime = audioCtx.currentTime + SYNC_DELAY_US / 1000000;
-    return baseAudioContextTime;
-  }
-
-  return baseAudioContextTime + (ts - baseAndroidTs) / 1000000;
-}
+let nextAudioPlayTime = 0;
+const SYNC_DELAY_US = 40000; // 40ms buffer for sync (ultra-low latency)
 
 function initDecoder() {
   if (decoder) {
@@ -90,12 +70,39 @@ function initDecoder() {
 
   decoder = new VideoDecoder({
     output: (frame) => {
-      const targetTime = getPlaybackTime(frame.timestamp || 0);
-      const now = audioCtx?.currentTime || 0;
+      const now = audioCtx ? audioCtx.currentTime : 0;
+      let targetTime = 0;
+
+      // Determine if audio is actively driving the master clock (within the last 1.5 seconds)
+      const isAudioActive = baseAndroidTs !== null && (Date.now() - lastAudioFrameTime < 1500);
+
+      if (isAudioActive) {
+        // Audio-master clock: calculate video target time relative to the audio playback anchor
+        targetTime = baseAudioContextTime + (frame.timestamp - baseAndroidTs) / 1000000;
+      } else {
+        // Fallback: Video drives its own clock
+        if (videoBaseAndroidTs === null || (Date.now() - lastVideoFrameTime > 1500)) {
+          videoBaseAndroidTs = frame.timestamp;
+          videoBaseAudioContextTime = now + SYNC_DELAY_US / 1000000;
+        }
+        targetTime = videoBaseAudioContextTime + (frame.timestamp - videoBaseAndroidTs) / 1000000;
+        lastVideoFrameTime = Date.now();
+      }
+
       const delayMs = (targetTime - now) * 1000;
 
       if (delayMs <= 5) {
         // Render immediately if delay is tiny (under 5ms)
+        if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
+          canvas.width = frame.displayWidth;
+          canvas.height = frame.displayHeight;
+        }
+        ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+        frame.close();
+        frameCount++;
+      } else if (delayMs > 1000) {
+        // Extreme delay - likely a sync jump/reset, render immediately
+        console.warn(`Extreme video delay (${delayMs.toFixed(0)}ms), rendering immediately.`);
         if (canvas.width !== frame.displayWidth || canvas.height !== frame.displayHeight) {
           canvas.width = frame.displayWidth;
           canvas.height = frame.displayHeight;
@@ -129,6 +136,10 @@ function initAudio() {
     audioCtx = new window.AudioContext({ latencyHint: 'interactive' });
   }
 
+  if (audioCtx.state === 'suspended') {
+    audioCtx.resume();
+  }
+
   // Re-create AudioDecoder on every call so reconnects get a fresh decoder.
   if (audioDecoder && audioDecoder.state !== 'closed') {
     audioDecoder.close();
@@ -152,9 +163,24 @@ function initAudio() {
       source.buffer = buffer;
       source.connect(audioCtx.destination);
 
-      const targetTime = getPlaybackTime(data.timestamp || 0);
-      const startTime = Math.max(targetTime, audioCtx.currentTime);
+      const duration = buffer.duration;
+      const now = audioCtx.currentTime;
+
+      // Schedule seamlessly back-to-back without overlapping or leaving silent gaps
+      let startTime = nextAudioPlayTime;
+      
+      // If we haven't scheduled yet, or if we have fallen behind (e.g. network stall)
+      if (startTime < now || startTime > now + 1.0) {
+        startTime = now + SYNC_DELAY_US / 1000000;
+      }
+
       source.start(startTime);
+      nextAudioPlayTime = startTime + duration;
+
+      // Update the master sync base using this audio frame's exact scheduled playback time
+      baseAndroidTs = data.timestamp || 0;
+      baseAudioContextTime = startTime;
+      lastAudioFrameTime = Date.now();
 
       if (audioStatusEl) {
         audioStatusEl.textContent = 'Audio: Live';
@@ -214,6 +240,8 @@ window.electronAPI.onPeerConnected((peer) => {
   peerEl.textContent = peer.address;
   statusEl.textContent = 'Connected, waiting for stream...';
   baseAndroidTs = null; // Reset sync
+  videoBaseAndroidTs = null; // Reset fallback sync
+  nextAudioPlayTime = 0; // Reset play schedule
   initDecoder(); // Re-init on new connection
   inputEnabled = false;
   if (btnProject) btnProject.style.display = 'block';
@@ -226,6 +254,8 @@ window.electronAPI.onPeerDisconnected(() => {
   pairingEl.style.display = 'none';
   inputEnabled = false;
   baseAndroidTs = null; // Reset sync
+  videoBaseAndroidTs = null; // Reset fallback sync
+  nextAudioPlayTime = 0; // Reset play schedule
   if (btnProject) btnProject.style.display = 'none';
 });
 

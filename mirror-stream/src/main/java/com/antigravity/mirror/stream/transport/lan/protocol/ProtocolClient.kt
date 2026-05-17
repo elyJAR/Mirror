@@ -146,7 +146,10 @@ class ProtocolClient(
     suspend fun connect() = withContext(scope.coroutineContext) {
         Log.i(TAG, "Connecting to $host:$port...")
         val socket = try {
-            aSocket(selector).tcp().connect(host, port)
+            aSocket(selector).tcp().connect(host, port) {
+                tcpNoDelay = true
+                keepAlive = true
+            }
         } catch (e: Exception) {
             throw MirrorError.NetworkUnreachable(host, e)
         }

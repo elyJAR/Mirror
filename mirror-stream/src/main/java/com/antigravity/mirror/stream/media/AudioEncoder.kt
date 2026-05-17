@@ -92,7 +92,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
 
     private fun runLoop(onAudioData: (ByteArray, Long) -> Unit) {
         val bufferInfo = MediaCodec.BufferInfo()
-        val pcmBuffer = ByteArray(4096) // 4KB chunks for optimized transmission frequency
+        val pcmBuffer = ByteArray(2048) // 2KB chunks for lower capture and transmission latency
 
         try {
             while (isRunning) {

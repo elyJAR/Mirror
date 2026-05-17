@@ -240,6 +240,8 @@ function startNetworkServices(window: BrowserWindow) {
   ipcMain.handle('project-to-extended', toggleProjection);
 
   tcpServer = net.createServer((socket) => {
+    socket.setNoDelay(true);
+    socket.setKeepAlive(true);
     activeSocket = socket;
     const remoteAddress = socket.remoteAddress;
     console.log('Phone connected:', remoteAddress);
