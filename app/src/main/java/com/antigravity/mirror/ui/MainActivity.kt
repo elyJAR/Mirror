@@ -644,26 +644,92 @@ class MainActivity : AppCompatActivity() {
     private fun showPinInputDialog() {
         if (pinDialog?.isShowing == true) return
         Log.i(TAG, "Showing PIN input dialog")
-        val input = EditText(this).apply {
-            inputType = InputType.TYPE_CLASS_NUMBER
-            hint = "0000"
+
+        val view = layoutInflater.inflate(R.layout.dialog_pin_entry, null)
+        val hiddenInput = view.findViewById<EditText>(R.id.hiddenPinInput)
+        val btnCancel = view.findViewById<MaterialButton>(R.id.btnCancel)
+        val btnConnect = view.findViewById<MaterialButton>(R.id.btnConnect)
+
+        val digits = arrayOf(
+            view.findViewById<TextView>(R.id.pinDigit1),
+            view.findViewById<TextView>(R.id.pinDigit2),
+            view.findViewById<TextView>(R.id.pinDigit3),
+            view.findViewById<TextView>(R.id.pinDigit4)
+        )
+
+        val pinRow = view.findViewById<View>(R.id.pinRow)
+
+        // Helper to update the active and filled visual states of the digit boxes
+        fun updatePinUi(text: CharSequence) {
+            for (i in 0 until 4) {
+                if (i < text.length) {
+                    digits[i].text = text[i].toString()
+                    digits[i].setBackgroundResource(R.drawable.bg_pin_digit_active)
+                } else {
+                    digits[i].text = ""
+                    if (i == text.length) {
+                        // Highlight the box currently awaiting input
+                        digits[i].setBackgroundResource(R.drawable.bg_pin_digit_active)
+                    } else {
+                        digits[i].setBackgroundResource(R.drawable.bg_pin_digit)
+                    }
+                }
+            }
+        }
+
+        // Initialize empty state UI
+        updatePinUi("")
+
+        hiddenInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val currentText = s ?: ""
+                updatePinUi(currentText)
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+
+        // Open system soft keyboard and focus the hidden EditText when digit cards are clicked
+        val focusAction = Runnable {
+            hiddenInput.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as android.view.inputmethod.InputMethodManager
+            imm.showSoftInput(hiddenInput, android.view.inputmethod.InputMethodManager.SHOW_IMPLICIT)
+        }
+
+        pinRow.setOnClickListener { focusAction.run() }
+        for (digit in digits) {
+            digit.setOnClickListener { focusAction.run() }
         }
 
         pinDialog = AlertDialog.Builder(this)
-            .setTitle(R.string.dialog_pin_title)
-            .setMessage(R.string.dialog_pin_message)
-            .setView(input)
-            .setPositiveButton(R.string.btn_connect) { _, _ ->
-                val pin = input.text.toString().trim()
-                if (pin.length == 4) {
-                    mirrorService?.submitPin(pin)
-                }
-            }
-            .setNegativeButton(R.string.btn_cancel) { _, _ ->
-                mirrorService?.disconnect()
-            }
+            .setView(view)
             .setCancelable(false)
-            .show()
+            .create()
+
+        btnCancel.setOnClickListener {
+            mirrorService?.disconnect()
+            pinDialog?.dismiss()
+            pinDialog = null
+        }
+
+        btnConnect.setOnClickListener {
+            val pin = hiddenInput.text.toString().trim()
+            if (pin.length == 4) {
+                mirrorService?.submitPin(pin)
+                pinDialog?.dismiss()
+                pinDialog = null
+            } else {
+                Toast.makeText(this, "Please enter a 4-digit PIN", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        pinDialog?.show()
+
+        // Clear the default Android white dialog window background so our rounded container is fully visible
+        pinDialog?.window?.setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
+
+        // Focus and pop-up keyboard automatically after the view finishes inflating
+        view.postDelayed(focusAction, 200)
     }
 
     private fun getMirrorConfig(): MirrorConfig {
