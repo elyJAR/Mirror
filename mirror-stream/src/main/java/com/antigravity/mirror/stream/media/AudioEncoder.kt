@@ -11,7 +11,7 @@ private const val TAG = "MirrorApp/AudioEncoder"
 private const val MIME_TYPE = "audio/mp4a-latm" // AAC
 private const val SAMPLE_RATE = 44100
 private const val CHANNEL_COUNT = 2
-private const val BITRATE = 128000
+private const val BITRATE = 64000
 private const val BUFFER_SIZE_FACTOR = 2
 
 /**
@@ -92,7 +92,7 @@ class AudioEncoder(private val mediaProjection: MediaProjection) {
 
     private fun runLoop(onAudioData: (ByteArray, Long) -> Unit) {
         val bufferInfo = MediaCodec.BufferInfo()
-        val pcmBuffer = ByteArray(2048) // 2KB chunks for lower latency
+        val pcmBuffer = ByteArray(4096) // 4KB chunks for optimized transmission frequency
 
         try {
             while (isRunning) {
