@@ -1,16 +1,18 @@
 import { app, BrowserWindow, ipcMain, Tray, Menu, nativeImage, clipboard, screen } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
-import { Bonjour, ServiceConfig } from 'bonjour-service';
-import * as net from 'net';
-import * as os from 'node:os';
-import * as dgram from 'node:dgram';
 
-function getLocalIpAddress(): string | undefined {
-  const interfaces = os.networkInterfaces();
+const os = require('os');
+
+// Monkey-patch os.networkInterfaces to exclude virtual/VPN adapters and APIPA addresses.
+// This is critical because third-party libraries like bonjour-service query all interfaces
+// directly to register DNS records, bypassing any local getLocalIpAddress filters.
+const originalNetworkInterfaces = os.networkInterfaces;
+os.networkInterfaces = () => {
+  const interfaces = originalNetworkInterfaces();
+  const filtered: NodeJS.Dict<os.NetworkInterfaceInfo[]> = {};
   for (const name of Object.keys(interfaces)) {
     const lowerName = name.toLowerCase();
-    // Skip virtual and VPN adapters commonly found on developer machines
     if (lowerName.includes('veth') || 
         lowerName.includes('vethernet') || 
         lowerName.includes('vmware') || 
@@ -29,13 +31,32 @@ function getLocalIpAddress(): string | undefined {
       continue;
     }
     const iface = interfaces[name];
+    if (iface) {
+      const filteredIface = iface.filter(net => {
+        if (net.family === 'IPv4') {
+          return !net.address.startsWith('169.254.');
+        }
+        return true;
+      });
+      if (filteredIface.length > 0) {
+        filtered[name] = filteredIface;
+      }
+    }
+  }
+  return filtered;
+};
+
+import { Bonjour, ServiceConfig } from 'bonjour-service';
+import * as net from 'net';
+import * as dgram from 'node:dgram';
+
+function getLocalIpAddress(): string | undefined {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    const iface = interfaces[name];
     if (!iface) continue;
     for (const net of iface) {
       if (net.family === 'IPv4' && !net.internal) {
-        // Skip APIPA (Automatic Private IP Addressing) e.g., 169.254.x.x
-        if (net.address.startsWith('169.254.')) {
-          continue;
-        }
         return net.address;
       }
     }
