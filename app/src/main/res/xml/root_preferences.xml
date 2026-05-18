@@ -40,6 +40,12 @@
             app:key="latency_mode"
             app:title="Latency Mode"
             app:useSimpleSummaryProvider="true" />
+
+        <SwitchPreferenceCompat
+            app:defaultValue="false"
+            app:key="keep_awake"
+            app:title="Keep Screen Awake"
+            app:summary="Prevent the phone's screen from turning off while streaming" />
     </PreferenceCategory>
 
 </PreferenceScreen>

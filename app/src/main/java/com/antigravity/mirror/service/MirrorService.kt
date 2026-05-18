@@ -11,6 +11,8 @@ import android.content.pm.ServiceInfo
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
+import android.net.wifi.WifiManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
@@ -46,6 +48,8 @@ class MirrorService : Service() {
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     
     private lateinit var client: MirrorClient
+    private var wakeLock: PowerManager.WakeLock? = null
+    private var wifiLock: WifiManager.WifiLock? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -60,8 +64,14 @@ class MirrorService : Service() {
             client.state.collect { state ->
                 Log.i(TAG, "Client state: ${state::class.simpleName}")
                 when (state) {
-                    is MirrorState.Streaming -> promoteToForeground(isStreaming = true)
-                    is MirrorState.Idle, is MirrorState.Error -> promoteToForeground(isStreaming = false)
+                    is MirrorState.Streaming -> {
+                        promoteToForeground(isStreaming = true)
+                        acquireWakeLocks()
+                    }
+                    is MirrorState.Idle, is MirrorState.Error -> {
+                        promoteToForeground(isStreaming = false)
+                        releaseWakeLocks()
+                    }
                     else -> {}
                 }
             }
@@ -97,9 +107,93 @@ class MirrorService : Service() {
 
     override fun onDestroy() {
         Log.i(TAG, "MirrorService destroying")
+        releaseWakeLocks()
         client.release()
         serviceScope.cancel()
         super.onDestroy()
+    }
+
+    private fun acquireWakeLocks() {
+        try {
+            if (wakeLock == null) {
+                val powerManager = getSystemService(Context.POWER_SERVICE) as PowerManager
+                
+                // Read preference to determine wake lock level
+                val prefs = androidx.preference.PreferenceManager.getDefaultSharedPreferences(this)
+                val keepAwake = prefs.getBoolean("keep_awake", false)
+                
+                val level = if (keepAwake) {
+                    @Suppress("DEPRECATION")
+                    PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE
+                } else {
+                    PowerManager.PARTIAL_WAKE_LOCK
+                }
+                
+                Log.i(TAG, "Creating WakeLock with level: ${if (keepAwake) "SCREEN_DIM" else "PARTIAL"}")
+                wakeLock = powerManager.newWakeLock(
+                    level,
+                    "MirrorApp::StreamingWakeLock"
+                ).apply {
+                    setReferenceCounted(false)
+                }
+            }
+            if (wakeLock?.isHeld == false) {
+                Log.i(TAG, "Acquiring PowerManager WakeLock")
+                wakeLock?.acquire(10 * 60 * 60 * 1000L) // 10 hours safety timeout
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire WakeLock", e)
+        }
+
+        try {
+            if (wifiLock == null) {
+                val wifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
+                wifiLock = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    wifiManager.createWifiLock(
+                        WifiManager.WIFI_MODE_FULL_HIGH_PERF,
+                        "MirrorApp::StreamingWifiLock"
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    wifiManager.createWifiLock(
+                        WifiManager.WIFI_MODE_FULL,
+                        "MirrorApp::StreamingWifiLock"
+                    )
+                }.apply {
+                    setReferenceCounted(false)
+                }
+            }
+            if (wifiLock?.isHeld == false) {
+                Log.i(TAG, "Acquiring WifiManager WifiLock")
+                wifiLock?.acquire()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to acquire WifiLock", e)
+        }
+    }
+
+    private fun releaseWakeLocks() {
+        try {
+            if (wakeLock?.isHeld == true) {
+                Log.i(TAG, "Releasing PowerManager WakeLock")
+                wakeLock?.release()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to release WakeLock", e)
+        } finally {
+            wakeLock = null
+        }
+
+        try {
+            if (wifiLock?.isHeld == true) {
+                Log.i(TAG, "Releasing WifiManager WifiLock")
+                wifiLock?.release()
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to release WifiLock", e)
+        } finally {
+            wifiLock = null
+        }
     }
 
     // --- Public API for MainActivity ---
