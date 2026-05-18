@@ -506,6 +506,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var pinDialog: AlertDialog? = null
+    private var activePinMessageView: TextView? = null
 
     // ── state renderer ─────────────────────────────────────────────────────────
 
@@ -515,6 +516,7 @@ class MainActivity : AppCompatActivity() {
         if (state !is MirrorState.AwaitingPairing) {
             pinDialog?.dismiss()
             pinDialog = null
+            activePinMessageView = null
         }
 
         if (state !is MirrorState.Discovering) {
@@ -563,9 +565,9 @@ class MainActivity : AppCompatActivity() {
 
             is MirrorState.AwaitingPairing -> {
                 connectingLabel.text    = getString(R.string.label_awaiting_pin)
-                connectingSubLabel.text = getString(R.string.dialog_pin_message)
+                connectingSubLabel.text = state.errorMsg ?: getString(R.string.dialog_pin_message)
                 showPanel(panelConnecting)
-                showPinInputDialog()
+                showPinInputDialog(state.errorMsg)
             }
 
             is MirrorState.Reconnecting -> {
@@ -661,14 +663,30 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun showPinInputDialog() {
-        if (pinDialog?.isShowing == true) return
+    private fun showPinInputDialog(errorMsg: String? = null) {
+        if (pinDialog?.isShowing == true) {
+            if (errorMsg != null) {
+                activePinMessageView?.text = errorMsg
+                activePinMessageView?.setTextColor(android.graphics.Color.parseColor("#EF4444")) // beautiful red
+            }
+            activeHiddenPinInput?.text?.clear()
+            return
+        }
         Log.i(TAG, "Showing PIN input dialog")
 
         val view = layoutInflater.inflate(R.layout.dialog_pin_entry, null)
         val hiddenInput = view.findViewById<EditText>(R.id.hiddenPinInput)
         val btnCancel = view.findViewById<MaterialButton>(R.id.btnCancel)
         val btnConnect = view.findViewById<MaterialButton>(R.id.btnConnect)
+        val dialogPinMessage = view.findViewById<TextView>(R.id.dialogPinMessage)
+
+        activePinMessageView = dialogPinMessage
+        activeHiddenPinInput = hiddenInput
+
+        if (errorMsg != null) {
+            dialogPinMessage?.text = errorMsg
+            dialogPinMessage?.setTextColor(android.graphics.Color.parseColor("#EF4444"))
+        }
 
         val digits = arrayOf(
             view.findViewById<TextView>(R.id.pinDigit1),
@@ -730,6 +748,8 @@ class MainActivity : AppCompatActivity() {
             mirrorService?.disconnect()
             pinDialog?.dismiss()
             pinDialog = null
+            activePinMessageView = null
+            activeHiddenPinInput = null
         }
 
         btnConnect.setOnClickListener {
@@ -738,6 +758,8 @@ class MainActivity : AppCompatActivity() {
                 mirrorService?.submitPin(pin)
                 pinDialog?.dismiss()
                 pinDialog = null
+                activePinMessageView = null
+                activeHiddenPinInput = null
             } else {
                 Toast.makeText(this, "Please enter a 4-digit PIN", Toast.LENGTH_SHORT).show()
             }

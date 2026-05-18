@@ -48,6 +48,12 @@ sealed interface TransportEvent {
      * PIN verification completed successfully and the session can proceed.
      */
     data object PairingVerified : TransportEvent
+
+    /**
+     * PIN verification failed.
+     */
+    data class PairingFailed(val reason: String) : TransportEvent
+
     /**
      * Protocol-specific control message received from the peer.
      */

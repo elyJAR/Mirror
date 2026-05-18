@@ -194,7 +194,7 @@ class MirrorClient(context: Context) {
                     Log.i(TAG, "Session established. pairingRequired=${session.pairingRequired}")
                     _state.value = if (session.pairingRequired) {
                         Log.i(TAG, "Setting state to AwaitingPairing")
-                        MirrorState.AwaitingPairing
+                        MirrorState.AwaitingPairing()
                     } else {
                         Log.i(TAG, "Setting state to AwaitingProjection")
                         MirrorState.AwaitingProjection
@@ -217,7 +217,10 @@ class MirrorClient(context: Context) {
                                 inputInjector?.invoke(event)
                             }
                             TransportEvent.PairingRequest -> {
-                                _state.value = MirrorState.AwaitingPairing
+                                _state.value = MirrorState.AwaitingPairing()
+                            }
+                            is TransportEvent.PairingFailed -> {
+                                _state.value = MirrorState.AwaitingPairing(event.reason)
                             }
                             TransportEvent.PairingVerified -> {
                                 _state.value = MirrorState.AwaitingProjection

@@ -28,7 +28,7 @@ sealed interface MirrorState {
     data object Connecting : MirrorState
 
     /** The peer requires a PIN. UI should show a keypad. */
-    data object AwaitingPairing : MirrorState
+    data class AwaitingPairing(val errorMsg: String? = null) : MirrorState
 
     /** Handshake done; waiting for the user to grant MediaProjection consent. */
     data object AwaitingProjection : MirrorState

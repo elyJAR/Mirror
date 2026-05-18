@@ -342,8 +342,8 @@ class ProtocolClient(
                     awaitingPin = false
                     scope.launch { _events.emit(TransportEvent.PairingVerified) }
                 } else {
-                    val error = msg.message ?: "Invalid PIN"
-                    scope.launch { _events.emit(TransportEvent.Error(MirrorError.HandshakeFailed("Authentication failed: $error"))) }
+                    val error = msg.message ?: "Incorrect password. Please try again."
+                    scope.launch { _events.emit(TransportEvent.PairingFailed(error)) }
                 }
             }
             is PongMessage -> {

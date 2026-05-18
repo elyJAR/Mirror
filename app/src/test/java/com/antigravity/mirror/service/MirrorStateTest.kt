@@ -38,10 +38,11 @@ class MirrorStateTest {
     }
 
     @Test
-    fun `AwaitingPairing is a singleton object`() {
-        val s1: MirrorState = MirrorState.AwaitingPairing
-        val s2: MirrorState = MirrorState.AwaitingPairing
-        assertEquals(s1, s2)
+    fun `AwaitingPairing carries optional error message`() {
+        val s1 = MirrorState.AwaitingPairing()
+        val s2 = MirrorState.AwaitingPairing("Incorrect password")
+        assertEquals(null, s1.errorMsg)
+        assertEquals("Incorrect password", s2.errorMsg)
     }
 
     @Test
@@ -100,7 +101,7 @@ class MirrorStateTest {
             MirrorState.Discovering -> "discovering"
             is MirrorState.ReceiversFound -> "receivers_found"
             MirrorState.Connecting -> "connecting"
-            MirrorState.AwaitingPairing -> "awaiting_pairing"
+            is MirrorState.AwaitingPairing -> "awaiting_pairing"
             MirrorState.AwaitingProjection -> "awaiting_projection"
             MirrorState.Streaming -> "streaming"
             MirrorState.Reconnecting -> "reconnecting"
@@ -111,7 +112,7 @@ class MirrorStateTest {
         assertEquals("discovering", label(MirrorState.Discovering))
         assertEquals("receivers_found", label(MirrorState.ReceiversFound(emptyList())))
         assertEquals("connecting", label(MirrorState.Connecting))
-        assertEquals("awaiting_pairing", label(MirrorState.AwaitingPairing))
+        assertEquals("awaiting_pairing", label(MirrorState.AwaitingPairing()))
         assertEquals("awaiting_projection", label(MirrorState.AwaitingProjection))
         assertEquals("streaming", label(MirrorState.Streaming))
         assertEquals("reconnecting", label(MirrorState.Reconnecting))
