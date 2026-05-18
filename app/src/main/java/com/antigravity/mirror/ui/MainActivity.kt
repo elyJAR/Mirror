@@ -507,6 +507,7 @@ class MainActivity : AppCompatActivity() {
 
     private var pinDialog: AlertDialog? = null
     private var activePinMessageView: TextView? = null
+    private var activeHiddenPinInput: EditText? = null
 
     // ── state renderer ─────────────────────────────────────────────────────────
 
@@ -517,6 +518,7 @@ class MainActivity : AppCompatActivity() {
             pinDialog?.dismiss()
             pinDialog = null
             activePinMessageView = null
+            activeHiddenPinInput = null
         }
 
         if (state !is MirrorState.Discovering) {
