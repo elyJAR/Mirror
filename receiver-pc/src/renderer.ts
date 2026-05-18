@@ -81,26 +81,28 @@ function initDecoder() {
 
   decoder = new VideoDecoder({
     output: (frame) => {
-      const now = audioCtx ? audioCtx.currentTime : 0;
       let targetTime = 0;
+      let delayMs = 0;
 
       // Determine if audio is actively driving the master clock (within the last 1.5 seconds)
       const isAudioActive = baseAndroidTs !== null && (Date.now() - lastAudioFrameTime < 1500);
 
-      if (isAudioActive) {
+      if (isAudioActive && audioCtx) {
         // Audio-master clock: calculate video target time relative to the audio playback anchor
+        const now = audioCtx.currentTime;
         targetTime = baseAudioContextTime + (frame.timestamp - baseAndroidTs) / 1000000;
+        delayMs = (targetTime - now) * 1000;
       } else {
-        // Fallback: Video drives its own clock
+        // Fallback: Video drives its own clock (uses performance.now() high-res ticking timeline)
+        const fallbackNow = performance.now() / 1000;
         if (videoBaseAndroidTs === null || (Date.now() - lastVideoFrameTime > 1500)) {
           videoBaseAndroidTs = frame.timestamp;
-          videoBaseAudioContextTime = now + SYNC_DELAY_US / 1000000;
+          videoBaseAudioContextTime = fallbackNow + SYNC_DELAY_US / 1000000;
         }
         targetTime = videoBaseAudioContextTime + (frame.timestamp - videoBaseAndroidTs) / 1000000;
         lastVideoFrameTime = Date.now();
+        delayMs = (targetTime - fallbackNow) * 1000;
       }
-
-      const delayMs = (targetTime - now) * 1000;
 
       if (delayMs <= 5) {
         // Render immediately if delay is tiny (under 5ms)
