@@ -159,6 +159,7 @@ let lastSessionParams: Record<string, unknown> | null = null;
 let currentPeerAddress: string | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
+let cleanupComplete = false;
 let activeSocket: net.Socket | null = null;
 
 let bonjour: Bonjour | null = null;
@@ -599,9 +600,25 @@ app.on('activate', () => {
   }
 });
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
   isQuitting = true;
   
+  if (!cleanupComplete) {
+    event.preventDefault();
+    performCleanup().then(() => {
+      cleanupComplete = true;
+      app.quit();
+    });
+  }
+});
+
+async function performCleanup() {
+  console.log('[Shutdown] Starting asynchronous cleanup...');
+  
+  // 1. Stop UDP advertising
+  stopUdpAdvertising();
+  
+  // 2. Destroy active socket
   if (activeSocket) {
     try {
       activeSocket.destroy();
@@ -612,6 +629,7 @@ app.on('before-quit', () => {
     activeSocket = null;
   }
   
+  // 3. Close TCP server
   if (tcpServer) {
     try {
       tcpServer.close();
@@ -621,14 +639,27 @@ app.on('before-quit', () => {
     }
     tcpServer = null;
   }
-});
-
-app.on('will-quit', () => {
-  stopUdpAdvertising();
-  try {
-    bonjour.destroy();
-  } catch (e) {
-    /* ignore bonjour destroy errors */
+  
+  // 4. Unpublish and destroy Bonjour service asynchronously
+  if (bonjour) {
+    try {
+      await new Promise<void>((resolve) => {
+        console.log('[Shutdown] Unpublishing mDNS services...');
+        bonjour.unpublishAll(() => {
+          console.log('[Shutdown] All mDNS services unpublished.');
+          resolve();
+        });
+        // Set a timeout of 500ms in case the callback doesn't fire or network is slow
+        setTimeout(resolve, 500);
+      });
+      bonjour.destroy();
+      console.log('[Shutdown] Bonjour instance destroyed.');
+    } catch (e) {
+      console.warn('[Shutdown] Failed to unpublish/destroy Bonjour:', e);
+    }
+    bonjour = null;
   }
-});
+  
+  console.log('[Shutdown] Asynchronous cleanup complete.');
+}
 
