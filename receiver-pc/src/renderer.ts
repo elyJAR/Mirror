@@ -71,6 +71,11 @@ let videoBaseAndroidTs: number | null = null;
 let videoBaseAudioContextTime = 0;
 let lastVideoFrameTime = 0; // JS timestamp when last video frame was processed
 
+// Wall clock sync (received from main window in projection mode)
+let baseRenderWallClock: number | null = null;
+let lastSyncSendTime = 0;
+let forceSyncSend = false;
+
 let nextAudioPlayTime = 0;
 const SYNC_DELAY_US = 40000; // 40ms buffer for sync (ultra-low latency)
 
@@ -81,27 +86,57 @@ function initDecoder() {
 
   decoder = new VideoDecoder({
     output: (frame) => {
-      let targetTime = 0;
       let delayMs = 0;
 
-      // Determine if audio is actively driving the master clock (within the last 1.5 seconds)
-      const isAudioActive = baseAndroidTs !== null && (Date.now() - lastAudioFrameTime < 1500);
-
-      if (isAudioActive && audioCtx) {
-        // Audio-master clock: calculate video target time relative to the audio playback anchor
-        const now = audioCtx.currentTime;
-        targetTime = baseAudioContextTime + (frame.timestamp - baseAndroidTs) / 1000000;
-        delayMs = (targetTime - now) * 1000;
-      } else {
-        // Fallback: Video drives its own clock (uses performance.now() high-res ticking timeline)
-        const fallbackNow = performance.now() / 1000;
-        if (videoBaseAndroidTs === null || (Date.now() - lastVideoFrameTime > 1500)) {
-          videoBaseAndroidTs = frame.timestamp;
-          videoBaseAudioContextTime = fallbackNow + SYNC_DELAY_US / 1000000;
+      if (isProjectionMode) {
+        // Projection mode: synchronize exactly to the parent (mainWindow) clock using wall time
+        if (baseRenderWallClock !== null && baseAndroidTs !== null) {
+          const targetWallClock = baseRenderWallClock + (frame.timestamp - baseAndroidTs) / 1000;
+          delayMs = targetWallClock - Date.now();
+        } else {
+          // Fallback if no sync state is received yet
+          delayMs = 0;
         }
-        targetTime = videoBaseAudioContextTime + (frame.timestamp - videoBaseAndroidTs) / 1000000;
-        lastVideoFrameTime = Date.now();
-        delayMs = (targetTime - fallbackNow) * 1000;
+      } else {
+        // Main window mode: calculate delay based on local audio-master or fallback clock
+        const isAudioActive = baseAndroidTs !== null && (Date.now() - lastAudioFrameTime < 1500);
+
+        if (isAudioActive && audioCtx) {
+          // Audio-master clock: calculate video target time relative to the audio playback anchor
+          const now = audioCtx.currentTime;
+          const targetTime = baseAudioContextTime + (frame.timestamp - baseAndroidTs) / 1000000;
+          delayMs = (targetTime - now) * 1000;
+        } else {
+          // Fallback: Video drives its own clock (uses performance.now() high-res ticking timeline)
+          const fallbackNow = performance.now() / 1000;
+          if (videoBaseAndroidTs === null || (Date.now() - lastVideoFrameTime > 1500)) {
+            videoBaseAndroidTs = frame.timestamp;
+            videoBaseAudioContextTime = fallbackNow + SYNC_DELAY_US / 1000000;
+          }
+          const targetTime = videoBaseAudioContextTime + (frame.timestamp - videoBaseAndroidTs) / 1000000;
+          lastVideoFrameTime = Date.now();
+          delayMs = (targetTime - fallbackNow) * 1000;
+        }
+
+        // Broadcast sync state to projection window (throttled to avoid IPC overhead, with forced immediate update on resets)
+        const nowMs = Date.now();
+        if (nowMs - lastSyncSendTime > 500 || forceSyncSend) {
+          const activeAndroidTs = isAudioActive ? baseAndroidTs : videoBaseAndroidTs;
+          const currentBaseRenderWallClock = isAudioActive && audioCtx
+            ? Date.now() + (baseAudioContextTime - audioCtx.currentTime) * 1000
+            : Date.now() + (videoBaseAudioContextTime - (performance.now() / 1000)) * 1000;
+
+          if (activeAndroidTs !== null && currentBaseRenderWallClock !== null) {
+            window.electronAPI.sendSyncState({
+              baseAndroidTs: activeAndroidTs,
+              baseRenderWallClock: currentBaseRenderWallClock,
+              lastAudioFrameTime: isAudioActive ? lastAudioFrameTime : Date.now(),
+              isAudioActive
+            });
+            lastSyncSendTime = nowMs;
+            forceSyncSend = false;
+          }
+        }
       }
 
       if (delayMs <= 5) {
@@ -185,6 +220,7 @@ function initAudio() {
       // If we haven't scheduled yet, or if we have fallen behind (e.g. network stall)
       if (startTime < now || startTime > now + 1.0) {
         startTime = now + SYNC_DELAY_US / 1000000;
+        forceSyncSend = true;
       }
 
       source.start(startTime);
@@ -324,7 +360,7 @@ window.electronAPI.onLocalIp((data: { ip: string; deviceName: string; execPath: 
       if (explanationEl) explanationEl.textContent = 'Your system firewall may block incoming network packets by default. Please configure your system firewall to allow incoming traffic on ports 8765 and 8768.';
     }
   } else {
-    ipStr = data;
+    ipStr = typeof data === 'string' ? data : '';
     if (waitingIpEl) waitingIpEl.textContent = ipStr;
   }
   
@@ -362,6 +398,15 @@ window.electronAPI.onControlMessage((msg) => {
   console.log('Control Message:', msg);
   if (msg.type === 'hello') {
     statusEl.textContent = `Streaming from ${msg.device}`;
+  }
+});
+
+window.electronAPI.onSyncState((state: unknown) => {
+  if (isProjectionMode && state) {
+    const s = state as { baseAndroidTs: number | null; baseRenderWallClock: number | null; lastAudioFrameTime: number };
+    baseAndroidTs = s.baseAndroidTs;
+    baseRenderWallClock = s.baseRenderWallClock;
+    lastAudioFrameTime = s.lastAudioFrameTime;
   }
 });
 

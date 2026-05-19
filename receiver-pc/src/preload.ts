@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Actions to send to Main process
   sendControl: (msg: Record<string, unknown>) => ipcRenderer.invoke('send-control', msg),
+  sendSyncState: (state: unknown) => ipcRenderer.invoke('send-sync-state', state),
   projectToExtended: () => ipcRenderer.invoke('project-to-extended'),
   getPairingState: () => ipcRenderer.invoke('get-pairing-state'),
 });

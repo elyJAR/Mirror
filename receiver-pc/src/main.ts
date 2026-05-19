@@ -360,6 +360,12 @@ function startNetworkServices(window: BrowserWindow) {
 
   ipcMain.handle('project-to-extended', toggleProjection);
 
+  ipcMain.handle('send-sync-state', async (_event, state) => {
+    if (projectionWindow && !projectionWindow.isDestroyed()) {
+      projectionWindow.webContents.send('sync-state', state);
+    }
+  });
+
   tcpServer = net.createServer((socket) => {
     socket.setNoDelay(true);
     socket.setKeepAlive(true);

@@ -10,6 +10,7 @@ export interface IElectronAPI {
   onProjectionState: (callback: (isProjecting: boolean) => void) => void;
   onSyncState: (callback: (state: unknown) => void) => void;
   sendControl: (msg: Record<string, unknown>) => Promise<void>;
+  sendSyncState: (state: unknown) => Promise<void>;
   projectToExtended: () => Promise<boolean>;
   getPairingState: () => Promise<unknown>;
 }
