@@ -30,6 +30,8 @@ class LanDiscoveryManager(private val context: Context) {
     fun discoverReceivers(): Flow<List<TransportTarget>> = callbackFlow {
         val nsdManager = context.getSystemService(Context.NSD_SERVICE) as NsdManager
         val discoveredServices = mutableMapOf<String, TransportTarget>()
+        val lastSeenTimes = mutableMapOf<String, Long>()
+        val udpDiscoveredDevices = mutableSetOf<String>()
 
         val discoveryListener = object : NsdManager.DiscoveryListener {
             override fun onDiscoveryStarted(regType: String) {
@@ -87,6 +89,36 @@ class LanDiscoveryManager(private val context: Context) {
             }
         }
 
+        // UDP cleanup job: removes UDP-discovered devices if they haven't been heard from for 5 seconds
+        val udpCleanupJob = launch(Dispatchers.Default) {
+            while (isActive) {
+                kotlinx.coroutines.delay(2000)
+                val now = System.currentTimeMillis()
+                var changed = false
+                synchronized(discoveredServices) {
+                    val toRemove = mutableListOf<String>()
+                    for (name in udpDiscoveredDevices) {
+                        val lastSeen = lastSeenTimes[name] ?: 0
+                        if (now - lastSeen > 5000) { // 5 seconds timeout
+                            toRemove.add(name)
+                        }
+                    }
+                    if (toRemove.isNotEmpty()) {
+                        for (name in toRemove) {
+                            discoveredServices.remove(name)
+                            udpDiscoveredDevices.remove(name)
+                            lastSeenTimes.remove(name)
+                        }
+                        changed = true
+                        Log.d(TAG, "Removed UDP devices due to timeout: $toRemove")
+                    }
+                }
+                if (changed) {
+                    trySend(synchronized(discoveredServices) { discoveredServices.values.toList() })
+                }
+            }
+        }
+
         // UDP fallback discovery listener (for mobile hotspots / local network routing bypass)
         var udpSocket: java.net.DatagramSocket? = null
         val udpJob = launch(Dispatchers.IO) {
@@ -106,22 +138,36 @@ class LanDiscoveryManager(private val context: Context) {
                     val nameMatch = "\"name\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(message)
                     val ipMatch = "\"ip\"\\s*:\\s*\"([^\"]+)\"".toRegex().find(message)
                     val portMatch = "\"port\"\\s*:\\s*(\\d+)".toRegex().find(message)
+                    val quitMatch = "\"quit\"\\s*:\\s*(true|false)".toRegex().find(message)
                     
                     val name = nameMatch?.groupValues?.get(1)
                     val ip = ipMatch?.groupValues?.get(1)
                     val port = portMatch?.groupValues?.get(1)?.toIntOrNull() ?: 8765
+                    val quit = quitMatch?.groupValues?.get(1)?.toBoolean() ?: false
                     
-                    if (name != null && ip != null) {
-                        val target = LanTransportTarget(
-                            name = name,
-                            host = ip,
-                            port = port
-                        )
+                    if (name != null) {
                         synchronized(discoveredServices) {
-                            if (discoveredServices[name] == null || discoveredServices[name]?.host != ip) {
-                                Log.i(TAG, "Device discovered via UDP Hotspot Fallback: $name at $ip:$port")
-                                discoveredServices[name] = target
-                                trySend(discoveredServices.values.toList())
+                            if (quit) {
+                                Log.i(TAG, "Device quit via UDP broadcast: $name")
+                                if (discoveredServices.remove(name) != null) {
+                                    udpDiscoveredDevices.remove(name)
+                                    lastSeenTimes.remove(name)
+                                    trySend(discoveredServices.values.toList())
+                                }
+                            } else if (ip != null) {
+                                val target = LanTransportTarget(
+                                    name = name,
+                                    host = ip,
+                                    port = port
+                                )
+                                lastSeenTimes[name] = System.currentTimeMillis()
+                                udpDiscoveredDevices.add(name)
+                                
+                                if (discoveredServices[name] == null || discoveredServices[name]?.host != ip) {
+                                    Log.i(TAG, "Device discovered via UDP Hotspot Fallback: $name at $ip:$port")
+                                    discoveredServices[name] = target
+                                    trySend(discoveredServices.values.toList())
+                                }
                             }
                         }
                     }
@@ -143,6 +189,7 @@ class LanDiscoveryManager(private val context: Context) {
         awaitClose {
             Log.d(TAG, "Closing discovery flow")
             udpJob.cancel()
+            udpCleanupJob.cancel()
             runCatching { udpSocket?.close() }
             runCatching { nsdManager.stopServiceDiscovery(discoveryListener) }
         }

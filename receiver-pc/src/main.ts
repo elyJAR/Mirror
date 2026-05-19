@@ -615,7 +615,28 @@ app.on('before-quit', (event) => {
 async function performCleanup() {
   console.log('[Shutdown] Starting asynchronous cleanup...');
   
-  // 1. Stop UDP advertising
+  // 1. Send UDP goodbye packets and stop UDP advertising
+  if (udpClient) {
+    try {
+      const ip = getLocalIpAddress();
+      if (ip) {
+        const message = JSON.stringify({
+          name: advertisedName,
+          port: 8765,
+          ip: ip,
+          quit: true
+        });
+        const payload = Buffer.from(message);
+        // Send three back-to-back goodbye broadcasts to ensure delivery over unreliable UDP
+        for (let i = 0; i < 3; i++) {
+          udpClient.send(payload, 0, payload.length, 8768, '255.255.255.255');
+        }
+        console.log('[UDP Broadcast] Sent shutdown goodbye packets');
+      }
+    } catch (e) {
+      console.warn('[UDP Broadcast] Failed to send goodbye packet:', e);
+    }
+  }
   stopUdpAdvertising();
   
   // 2. Destroy active socket
