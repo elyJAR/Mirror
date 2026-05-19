@@ -90,16 +90,7 @@ function startUdpAdvertising() {
     console.warn('[UDP Broadcast] Socket error:', err);
   });
 
-  client.bind(0, () => {
-    try {
-      client.setBroadcast(true);
-      console.log('[UDP Broadcast] Socket bound to random port and broadcast enabled');
-    } catch (err) {
-      console.warn('[UDP Broadcast] Failed to enable broadcast on bind:', err);
-    }
-  });
-  
-  udpTimer = setInterval(() => {
+  const sendBroadcast = () => {
     try {
       const ip = getLocalIpAddress();
       if (!ip) return;
@@ -121,7 +112,19 @@ function startUdpAdvertising() {
     } catch (err) {
       console.warn('[UDP Broadcast] Error in advertising loop:', err);
     }
-  }, 2000);
+  };
+
+  client.bind(0, () => {
+    try {
+      client.setBroadcast(true);
+      console.log('[UDP Broadcast] Socket bound to random port and broadcast enabled');
+      sendBroadcast();
+    } catch (err) {
+      console.warn('[UDP Broadcast] Failed to enable broadcast on bind:', err);
+    }
+  });
+  
+  udpTimer = setInterval(sendBroadcast, 2000);
 }
 
 function stopUdpAdvertising() {
@@ -158,8 +161,7 @@ let tray: Tray | null = null;
 let isQuitting = false;
 let activeSocket: net.Socket | null = null;
 
-const ipAddr = getLocalIpAddress();
-const bonjour = new Bonjour(ipAddr ? { interface: ipAddr } as unknown as Partial<ServiceConfig> : undefined);
+let bonjour: Bonjour | null = null;
 let tcpServer: net.Server | null = null;
 const currentPin = Math.floor(1000 + Math.random() * 9000).toString();
 const advertisedName = `Mirror (${os.hostname()})`;
@@ -452,17 +454,19 @@ function startNetworkServices(window: BrowserWindow) {
     console.log('TCP Server listening on port 8765 (all interfaces)');
     const ip = getLocalIpAddress();
     console.log(`[Network Setup] Detected physical local IP: ${ip || 'Unknown IP'}`);
-    console.log(`[mDNS Bonjour] Advertising on interface IP: ${ipAddr || 'Default (All Interfaces)'}`);
+    console.log(`[mDNS Bonjour] Advertising on interface IP: ${ip || 'Default (All Interfaces)'}`);
   });
 
   // Advertise service via mDNS
   try {
+    const ip = getLocalIpAddress();
+    bonjour = new Bonjour(ip ? { interface: ip } as unknown as Partial<ServiceConfig> : undefined);
     bonjour.publish({ 
       name: advertisedName,
       type: 'mirror', 
       protocol: 'tcp', 
       port: 8765,
-      host: getLocalIpAddress()
+      host: ip
     });
   } catch (error) {
     console.warn('mDNS advertise failed; continuing with TCP server only:', error);
