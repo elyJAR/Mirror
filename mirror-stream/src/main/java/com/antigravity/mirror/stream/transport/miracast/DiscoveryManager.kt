@@ -165,7 +165,6 @@ class DiscoveryManager(private val context: Context) {
     fun connectToDevice(device: WifiP2pDevice): Flow<ConnectionEvent> = callbackFlow {
         val config = WifiP2pConfig().apply {
             deviceAddress = device.deviceAddress
-            wps.setup = android.net.wifi.WpsInfo.PBC
             // Use intent=7 (default) to negotiate GO role naturally. Since the RTP sender
             // target IP is now dynamically set to the connected RTSP socket IP, streaming
             // succeeds whether the phone or the PC is the Group Owner.
