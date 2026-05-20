@@ -166,10 +166,10 @@ class DiscoveryManager(private val context: Context) {
         val config = WifiP2pConfig().apply {
             deviceAddress = device.deviceAddress
             wps.setup = android.net.wifi.WpsInfo.PBC
-            // Let the peer (Miracast sink / Windows Connect) become the Group Owner.
-            // Forcing 15 here causes negotiation to fail or leaves the phone as the
-            // unexpected GO, which Windows then refuses to stream to.
-            groupOwnerIntent = 0
+            // Use intent=7 (default) to negotiate GO role naturally. Since the RTP sender
+            // target IP is now dynamically set to the connected RTSP socket IP, streaming
+            // succeeds whether the phone or the PC is the Group Owner.
+            groupOwnerIntent = 7
         }
 
         // Capture the channel so callbacks outside the lambda can emit events
@@ -237,6 +237,15 @@ class DiscoveryManager(private val context: Context) {
 
         awaitClose {
             timeoutJob.cancel()
+            Log.d(TAG, "Closing connection flow — cancelling any pending P2P connection")
+            wifiP2pManager.cancelConnect(p2pChannel, object : WifiP2pManager.ActionListener {
+                override fun onSuccess() {
+                    Log.d(TAG, "cancelConnect succeeded on flow cleanup")
+                }
+                override fun onFailure(reason: Int) {
+                    Log.d(TAG, "cancelConnect failed (reason=$reason) on flow cleanup")
+                }
+            })
             try {
                 context.unregisterReceiver(receiver)
             } catch (e: IllegalArgumentException) {
