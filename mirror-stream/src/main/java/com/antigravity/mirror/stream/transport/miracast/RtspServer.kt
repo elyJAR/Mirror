@@ -11,6 +11,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.io.PrintWriter
+import java.net.InetAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.atomic.AtomicReference
@@ -54,6 +55,13 @@ class RtspServer(private val port: Int = 7236) {
      */
     private val writerRef = AtomicReference<PrintWriter?>(null)
     private val writerLock = Any()
+
+    /**
+     * Returns the IP address of the connected Miracast sink, or null if not connected.
+     */
+    fun getClientAddress(): InetAddress? {
+        return clientSocketRef.get()?.inetAddress
+    }
 
     /**
      * Starts the TCP server and returns a [Flow] of parsed [RtspMessage] objects.

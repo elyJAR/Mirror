@@ -21,9 +21,15 @@ import kotlin.random.Random
  *   Bytes 8-11: SSRC (big-endian, random fixed value per session)
  */
 class RtpSender(
-    private val sinkAddress: InetAddress,
+    @Volatile private var sinkAddress: InetAddress,
     private val rtpPort: Int
 ) {
+    /**
+     * Updates the target IP address for RTP video streaming dynamically.
+     */
+    fun updateSinkAddress(address: InetAddress) {
+        sinkAddress = address
+    }
     companion object {
         private const val RTP_HEADER_SIZE = 12
         private const val RTP_VERSION_FLAGS: Byte = 0x80.toByte()  // V=2, P=0, X=0, CC=0

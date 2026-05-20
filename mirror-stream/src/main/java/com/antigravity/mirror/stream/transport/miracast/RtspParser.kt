@@ -54,13 +54,27 @@ object RtspParser {
         val requestParts = requestLine.split(Regex("\\s+"))
         if (requestParts.size < 3) {
             throw IllegalArgumentException(
-                "Malformed RTSP request line (expected 'METHOD URI RTSP/1.0'): '$requestLine'"
+                "Malformed RTSP request line (expected 'METHOD URI RTSP/1.0' or 'RTSP/1.0 STATUS REASON'): '$requestLine'"
             )
         }
-        val method = requestParts[0]
-        val uri = requestParts[1]
-        val version = requestParts[2]
-        if (!version.equals("RTSP/1.0", ignoreCase = true)) {
+        
+        val method: String
+        val uri: String
+        val version: String
+        
+        if (requestParts[0].startsWith("RTSP/", ignoreCase = true)) {
+            // This is an RTSP response (e.g. RTSP/1.0 200 OK)
+            version = requestParts[0]
+            method = "RESPONSE"
+            uri = requestParts[1] // Use status code as the URI for compatibility
+        } else {
+            // This is an RTSP request (e.g. OPTIONS * RTSP/1.0)
+            method = requestParts[0]
+            uri = requestParts[1]
+            version = requestParts[2]
+        }
+
+        if (!version.startsWith("RTSP/", ignoreCase = true)) {
             throw IllegalArgumentException(
                 "Unsupported RTSP version '$version'; only RTSP/1.0 is supported"
             )

@@ -101,11 +101,17 @@ private class MiracastTransportSession(
                     when (event) {
                         is SessionEvent.NegotiationComplete -> {
                             Log.i(TAG, "RTSP negotiation (M1-M7) complete")
+                            rtspServer.getClientAddress()?.let { clientAddress ->
+                                Log.i(TAG, "Updating RtpSender target address to RTSP client: ${clientAddress.hostAddress}")
+                                rtpSender.updateSinkAddress(clientAddress)
+                            }
                         }
                         is SessionEvent.PlayRequested -> {
                             Log.i(TAG, "Sink sent PLAY — ready to receive RTP stream")
-                            // We don't need to do anything special here as the RTP sender
-                            // loop is already waiting for frames from the videoSink.
+                            rtspServer.getClientAddress()?.let { clientAddress ->
+                                Log.i(TAG, "Ensuring RtpSender target address is correct on PLAY: ${clientAddress.hostAddress}")
+                                rtpSender.updateSinkAddress(clientAddress)
+                            }
                         }
                         is SessionEvent.StreamingError -> {
                             Log.e(TAG, "RTSP streaming error: ${event.cause.message}")

@@ -120,6 +120,12 @@ class WfdSessionManager(
                     return@collect
                 }
 
+                // Ignore any RTSP response messages
+                if (message.method.equals("RESPONSE", ignoreCase = true)) {
+                    Log.d(TAG, "Received RTSP response status=${message.uri} CSeq=${message.cseq} — ignoring")
+                    return@collect
+                }
+
                 when (state) {
                     WfdState.AWAITING_M1_OPTIONS -> {
                         if (message.method.equals("OPTIONS", ignoreCase = true)) {

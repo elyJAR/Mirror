@@ -165,6 +165,7 @@ class DiscoveryManager(private val context: Context) {
     fun connectToDevice(device: WifiP2pDevice): Flow<ConnectionEvent> = callbackFlow {
         val config = WifiP2pConfig().apply {
             deviceAddress = device.deviceAddress
+            wps.setup = android.net.wifi.WpsInfo.PBC
             // Let the peer (Miracast sink / Windows Connect) become the Group Owner.
             // Forcing 15 here causes negotiation to fail or leaves the phone as the
             // unexpected GO, which Windows then refuses to stream to.
