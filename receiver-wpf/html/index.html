@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>Mirror Receiver</title>
+    <link rel="stylesheet" href="./index.css" />
+  </head>
+  <body>
+    <div id="status">Initializing...</div>
+    <div id="controls" style="position: absolute; top: 10px; right: 10px; z-index: 15; display: flex; gap: 8px;">
+        <button id="btnProject" style="background: rgba(0,122,255,0.7); border: none; color: white; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 11px; display: none;">Project to Extended</button>
+    </div>
+    <canvas id="videoCanvas"></canvas>
+    
+    <!-- Premium Waiting Screen -->
+    <div id="waiting-panel">
+        <div class="radar-container">
+            <div class="radar-ring ring1"></div>
+            <div class="radar-ring ring2"></div>
+            <div class="radar-ring ring3"></div>
+            <div class="radar-logo">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="2" width="20" height="14" rx="2" ry="2"></rect>
+                    <line x1="8" y1="21" x2="16" y2="21"></line>
+                    <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+            </div>
+        </div>
+        <h2 class="app-title">Mirror Receiver</h2>
+        <div id="waiting-device-name" class="device-pill">Mirror Broadcasting</div>
+        
+        <div class="connection-box">
+            <div class="ip-label">Local Connection Address</div>
+            <div class="ip-row">
+                <span id="waiting-ip">Detecting network address...</span>
+                <button id="btnCopyIp" class="action-btn" style="display: none;">Copy</button>
+            </div>
+        </div>
+
+        <div class="status-indicator">
+            <span class="dot pulse"></span>
+            <span id="waiting-status-text">Broadcasting over Wi-Fi Subnet & mDNS...</span>
+        </div>
+
+        <!-- Troubleshooting Panel -->
+        <div class="trouble-card">
+            <div class="trouble-header" id="troubleHeader">
+                <span>Troubleshoot Connection / Firewall</span>
+                <svg id="troubleArrow" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transition: transform 0.3s;">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                </svg>
+            </div>
+            <div class="trouble-content" id="troubleContent">
+                <p><strong>Phone cannot discover PC?</strong></p>
+                <p class="explanation">
+                    Windows Defender Firewall blocks incoming TCP/UDP connections for new executables by default. Run the command below to add the necessary exceptions.
+                </p>
+                <div class="powershell-section">
+                    <div class="ps-label">Windows PowerShell Fix Command</div>
+                    <button id="btnCopyPs" class="ps-copy-btn">Copy Firewall Fix Command</button>
+                </div>
+                <p class="tip">Paste the copied command into an <strong>Administrator PowerShell</strong> window to instantly add the firewall exceptions.</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="pairing">
+        <div style="font-size: 18px; color: #888;">Enter PIN on your phone</div>
+        <div id="pin">----</div>
+        <div style="font-size: 14px; color: #555;">Waiting for connection...</div>
+    </div>
+    <div id="debug-logs"></div>
+    <div id="hud" style="display: flex; align-items: center; gap: 10px;">
+        <button id="btnRefresh" style="background: rgba(255,255,255,0.1); border: 1px solid #444; color: #888; cursor: pointer; padding: 2px 8px; border-radius: 4px; font-size: 10px;">Refresh</button>
+        <span id="peer">No Peer</span> | 
+        <span id="stats">0 FPS / 0 kbps</span> |
+        <span id="audio-status" style="color: #ff4444;">Audio: Off</span>
+    </div>
+    <script src="./renderer.js"></script>
+  </body>
+</html>

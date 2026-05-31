@@ -80,3 +80,8 @@ lint/tmp/
 
 # Kiro
 .kiro/
+
+# .NET / C# Build Outputs
+[Bb]in/
+[Oo]bj/
+
