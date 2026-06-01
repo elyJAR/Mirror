@@ -70,7 +70,6 @@ namespace MirrorReceiverCs
             try
             {
                 await webView.EnsureCoreWebView2Async();
-                webView.ZoomFactor = 1.0;
 
                 // Map local folder html/ to https://mirror-receiver.local/
                 string htmlDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html");
@@ -85,6 +84,7 @@ namespace MirrorReceiverCs
                 // Send local network details once the webview loads
                 webView.CoreWebView2.NavigationCompleted += (s, e) =>
                 {
+                    webView.ZoomFactor = 1.0;
                     SendIpDetailsToWebView();
                 };
             }
@@ -396,7 +396,8 @@ namespace MirrorReceiverCs
                 Left = secondaryScreen.Bounds.X,
                 Top = secondaryScreen.Bounds.Y,
                 Width = secondaryScreen.Bounds.Width,
-                Height = secondaryScreen.Bounds.Height
+                Height = secondaryScreen.Bounds.Height,
+                UseLayoutRounding = true
             };
 
             var grid = new System.Windows.Controls.Grid();
@@ -424,7 +425,6 @@ namespace MirrorReceiverCs
             try
             {
                 await _projectionWebView.EnsureCoreWebView2Async();
-                _projectionWebView.ZoomFactor = 1.0;
 
                 string htmlDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html");
                 _projectionWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
@@ -436,6 +436,7 @@ namespace MirrorReceiverCs
                 
                 _projectionWebView.CoreWebView2.NavigationCompleted += (s, e) =>
                 {
+                    _projectionWebView.ZoomFactor = 1.0;
                     // Sync current connection states to projection
                     if (!string.IsNullOrEmpty(_currentClientIp))
                     {

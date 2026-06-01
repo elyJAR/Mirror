@@ -286,7 +286,15 @@ class MirrorClient(context: Context) {
         Log.i(TAG, "Projection granted, starting media pipeline")
 
             try {
-                val isPortrait = appContext.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+                val displayManager = appContext.getSystemService(Context.DISPLAY_SERVICE) as android.hardware.display.DisplayManager
+                val display = displayManager.getDisplay(android.view.Display.DEFAULT_DISPLAY)
+                val isPortrait = if (display != null) {
+                    val realSize = android.graphics.Point()
+                    display.getRealSize(realSize)
+                    realSize.y > realSize.x
+                } else {
+                    appContext.resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+                }
                 if (isPortrait) {
                     Log.i(TAG, "Device is in portrait orientation. Swapping resolution parameters to portrait.")
                     negotiatedWidth = config.height

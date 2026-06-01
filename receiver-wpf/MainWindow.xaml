@@ -6,7 +6,8 @@
         Height="720" Width="1280"
         MinHeight="360" MinWidth="640"
         Background="#000000"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        UseLayoutRounding="True">
     <Grid>
         <wpf:WebView2 Name="webView" />
     </Grid>
