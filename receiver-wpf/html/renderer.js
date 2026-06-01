@@ -515,7 +515,7 @@ setInterval(() => {
     const fps = Math.round(frameCount / elapsed);
     const kbps = Math.round((bytesReceived * 8) / (1000 * elapsed));
     
-    statsEl.textContent = `${fps} FPS / ${kbps} kbps`;
+    statsEl.textContent = `${fps} FPS / ${kbps} kbps / ${canvas.width}x${canvas.height}`;
     frameCount = 0;
     bytesReceived = 0;
     lastStatsTime = now;

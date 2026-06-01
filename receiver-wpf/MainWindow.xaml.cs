@@ -70,6 +70,7 @@ namespace MirrorReceiverCs
             try
             {
                 await webView.EnsureCoreWebView2Async();
+                webView.ZoomFactor = 1.0;
 
                 // Map local folder html/ to https://mirror-receiver.local/
                 string htmlDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html");
@@ -423,6 +424,7 @@ namespace MirrorReceiverCs
             try
             {
                 await _projectionWebView.EnsureCoreWebView2Async();
+                _projectionWebView.ZoomFactor = 1.0;
 
                 string htmlDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "html");
                 _projectionWebView.CoreWebView2.SetVirtualHostNameToFolderMapping(
